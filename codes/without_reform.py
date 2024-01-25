@@ -76,22 +76,31 @@ def build_entity(data_persons, sb, nom_entite, nom_entite_pluriel, id_entite, id
 
 def deal_with_married_couples(data_people):
     """
-    Here are the statut_marital values:
+    Here are the statut_marital values: (see https://github.com/openfisca/openfisca-france-data/blob/6f7af1a194baf07ab4cfacb6ce1d4e817d9913b8/openfisca_france_data/erfs_fpr/input_data_builder/step_03_variables_individuelles.py#L929 )
       1 - "Marié",
       2 - "Célibataire",
       3 - "Divorcé",
-      4 - "Veuf",
-      5 - "Pacsé",
-      6 - "Jeune veuf"
+      4 - "Veuf"
+
+    The goal of this function is to perform equal split of earnings between couples (equal split couples)
     """
     earnings_variables = ["chomage_brut", "pensions_alimentaires_percues", "pensions_invalidite",
                       "rag", "retraite_brute", "ric", "rnc", "rpns_imposables", "salaire_de_base",
                       "primes_fonction_publique", "traitement_indiciaire_brut"]
-    print("data_people", data_people)
 
-    
+    married_df = data_people[data_people['statut_marital'] == 1]
+    married_mean_df = married_df.groupby('idfoy')[earnings_variables].mean().reset_index()
+    married_augmented_df = pandas.merge(married_mean_df, married_df, on='idfoy', suffixes=('', '_oldvalues'))
 
-    print("result_df", result_df)
+    columns_to_drop = married_augmented_df.filter(like='_oldvalues').columns
+    married_augmented_df.drop(columns=columns_to_drop, inplace=True)
+
+    single_df = data_people[data_people['statut_marital'] != 1]
+    final_df = pandas.concat([single_df, married_augmented_df]).sort_values(by='idfoy')
+
+    print("final_df", final_df)
+    return final_df
+
 
 
 
@@ -108,10 +117,13 @@ def simulate_sans_reforme(beginning_year = None, end_year = None):
     data_households_brut =  pandas.read_hdf(filename, key = "menage_{}".format(beginning_year))
     data_people = data_people_brut.merge(data_households_brut, right_index = True, left_on = "idmen", suffixes = ("", "_x"))
 
+
+
+    # perform equal split of earnings within couples 
+    data_people = deal_with_married_couples(data_people)
+
     print("People data")
     print(data_people, "\n\n\n\n\n")
-
-    deal_with_married_couples(data_people)
 
     
     #####################################################
