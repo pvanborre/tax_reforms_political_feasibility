@@ -4,9 +4,32 @@ import pandas
 import click
 
 from openfisca_core.simulation_builder import SimulationBuilder
+from openfisca_core.reforms import Reform
+from openfisca_core import periods
 from openfisca_france import FranceTaxBenefitSystem
 
 pandas.options.display.max_columns = None
+
+
+# First, we update the value of some parameters (which were null, and some formulas required their values, so we set them to 0).
+def modify_parameters(parameters):
+    reform_period = periods.period("2003")
+    parameters.impot_revenu.calcul_reductions_impots.divers.intemp.max.update(period = reform_period, value = 0)
+    parameters.impot_revenu.calcul_reductions_impots.divers.intemp.pac.update(period = reform_period, value = 0)
+    parameters.impot_revenu.calcul_reductions_impots.divers.interets_emprunt_reprise_societe.plafond.update(period = reform_period, value = 0)
+    parameters.impot_revenu.calcul_reductions_impots.divers.interets_emprunt_reprise_societe.taux.update(period = reform_period, value = 0)
+    return parameters
+
+
+class modify_parameters_2003(Reform):
+    name = "we code the reform new_tax = old_tax + τ1 primary_earning + τ2 secondary_earning"
+    def apply(self):
+        # we apply the parameters modification for year 2003
+        self.modify_parameters(modifier_function = modify_parameters)
+
+
+
+
 
 
 def initialize_simulation(tax_benefit_system, data_persons):
@@ -73,7 +96,7 @@ def build_entity(data_persons, sb, nom_entite, nom_entite_pluriel, id_entite, id
 
 
 
-def deal_with_married_couples(data_people):
+def deal_with_married_couples(data_people, earnings_variables):
     """
     Here are the statut_marital values: (see https://github.com/openfisca/openfisca-france-data/blob/6f7af1a194baf07ab4cfacb6ce1d4e817d9913b8/openfisca_france_data/erfs_fpr/input_data_builder/step_03_variables_individuelles.py#L929 )
       1 - "Marié",
@@ -83,9 +106,6 @@ def deal_with_married_couples(data_people):
 
     The goal of this function is to perform equal split of earnings between couples (equal split couples)
     """
-    earnings_variables = ["chomage_brut", "pensions_alimentaires_percues", "pensions_invalidite",
-                      "rag", "retraite_brute", "ric", "rnc", "rpns_imposables", "salaire_de_base",
-                      "primes_fonction_publique", "traitement_indiciaire_brut"]
 
     married_df = data_people[data_people['statut_marital'] == 1]
     married_mean_df = married_df.groupby('idfoy')[earnings_variables].mean().reset_index()
@@ -119,8 +139,16 @@ def simulate_without_reform(beginning_year = None, end_year = None):
     # remark : the idea in OpenFisca France-data is to say that individuals have the weight of their households (what is done in the left join above)
     # but we work here at the indiviudal level so no need to construct a foyer fiscal weight 
 
+    if beginning_year<=2013:
+        earnings_columns = ["chomage_brut", "pensions_alimentaires_percues", "rag", "retraite_brute",
+            "ric", "rnc", "rpns_imposables", "salaire_de_base", "primes_fonction_publique", "traitement_indiciaire_brut"]
+
+    else:
+        earnings_columns = ["chomage_brut", "pensions_alimentaires_percues", "pensions_invalidite", "rag", "retraite_brute",
+            "ric", "rnc", "rpns_imposables", "salaire_de_base", "primes_fonction_publique", "traitement_indiciaire_brut"]
+
     # perform equal split of earnings within couples 
-    data_people = deal_with_married_couples(data_people)
+    data_people = deal_with_married_couples(data_people, earnings_columns)
 
     print("People data")
     print(data_people, "\n\n\n\n\n")
@@ -129,8 +157,11 @@ def simulate_without_reform(beginning_year = None, end_year = None):
     #####################################################
     ########### Simulation ##############################
     #####################################################
+    if beginning_year <= 2003:
+        tax_benefit_system = modify_parameters_2003(FranceTaxBenefitSystem())
+    else:
+        tax_benefit_system = FranceTaxBenefitSystem()
 
-    tax_benefit_system = FranceTaxBenefitSystem()
     simulation = initialize_simulation(tax_benefit_system, data_people)
     beginning_reform = str(beginning_year)
     end_reform = str(end_year) 
@@ -153,8 +184,6 @@ def simulate_without_reform(beginning_year = None, end_year = None):
     inflation_coeff = (CPI[end_reform]-CPI[beginning_reform])/CPI[beginning_reform]
     print("Inflation coefficient", inflation_coeff)
 
-    earnings_columns = ["chomage_brut", "pensions_alimentaires_percues", "pensions_invalidite", "rag", "retraite_brute",
-                "ric", "rnc", "rpns_imposables", "salaire_de_base", "primes_fonction_publique", "traitement_indiciaire_brut"]
 
 
     for ma_variable in data_people.columns.tolist():
