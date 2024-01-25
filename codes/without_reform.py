@@ -72,23 +72,25 @@ def build_entity(data_persons, sb, nom_entite, nom_entite_pluriel, id_entite, id
 
 
 
-def split_earnings(group):
+def split_earnings(group, variable_name):
     married_mask = group['marital_status'] == 1
     pacses_mask = group['marital_status'] == 5
 
+    # if num_married == 2, then performs equal split of the earnings between couples
+    
     if married_mask.any():
-        total_earning_married = group[married_mask]['earning'].sum()
+        total_earning_married = group[married_mask][variable_name].sum()
         num_married = married_mask.sum()
-        group.loc[married_mask, 'earning'] = total_earning_married / num_married
+        group.loc[married_mask, variable_name] = total_earning_married / num_married
     if pacses_mask.any():
-        total_earning_pacses = group[pacses_mask]['earning'].sum()
+        total_earning_pacses = group[pacses_mask][variable_name].sum()
         num_pacses = pacses_mask.sum()
-        group.loc[pacses_mask, 'earning'] = total_earning_pacses / num_pacses
+        group.loc[pacses_mask, variable_name] = total_earning_pacses / num_pacses
 
     return group
 
-# Applying the function to the DataFrame
-result_df = df.groupby('id_household').apply(split_earnings).reset_index(drop=True)
+
+result_df = df.groupby('id_household').apply(split_earnings, variable_name='earning').reset_index(drop=True)
 
 print(result_df)
 
