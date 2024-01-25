@@ -130,6 +130,13 @@ def simulate_without_reform(beginning_year = None, end_year = None):
     # perform equal split of earnings within couples 
     data_people = deal_with_married_couples(data_people)
 
+    # data_people['idfoy'] = numpy.arange(len(data_people))
+    # data_people['idfam'] = numpy.arange(len(data_people))
+    # data_people['idmen'] = numpy.arange(len(data_people))
+    # data_people['quifoy'] = 0
+    # data_people['quifam'] = 0
+    # data_people['quimen'] = 0
+
     print("People data")
     print(data_people, "\n\n\n\n\n")
 
@@ -188,11 +195,20 @@ def simulate_without_reform(beginning_year = None, end_year = None):
     print(total_taxes_before_reform)
     total_taxes_after_reform = simulation.calculate('impot_revenu_restant_a_payer', end_reform)
     print(total_taxes_after_reform)
+    tax_difference = -total_taxes_after_reform + total_taxes_before_reform #impot_revenu_restant_a_payer is negative in the model
 
-    tax_difference = total_taxes_after_reform - total_taxes_before_reform
-    #data_people['tax_difference'] = tax_difference
+    data_foyerfiscaux = pandas.DataFrame()
+    data_foyerfiscaux['idfoy'] = numpy.arange(len(total_taxes_after_reform))
+    data_foyerfiscaux['total_taxes_before_reform'] = total_taxes_before_reform
+    data_foyerfiscaux['total_taxes_after_reform'] = total_taxes_after_reform
+    data_foyerfiscaux['tax_difference'] = tax_difference
+    print(data_foyerfiscaux)
     # huge problem here : data_people individual level whereas tax at the foyer_fiscal level
-    # solution : put each individual in its own foyer fiscal
+    # solution : put each individual in its own foyer fiscal 
+    # NO ! keep real foyer fiscaux and just merge afterwards, delete 0 earnings and split between couples
+
+    data_people = pandas.merge(data_people, data_foyerfiscaux, on='idfoy', how = 'left')
+    print("data_people", data_people)
 
     # in our data we do not have capital revenue (rvcm) so we rank people according to their normal income
     data_people['total_earning'] = data_people[earnings_columns].sum(axis=1)
