@@ -13,6 +13,7 @@ pandas.options.display.max_columns = None
 def initialize_simulation(tax_benefit_system, data_persons):
     """
     Declares all 4 types of OpenFisca : individuals, households, families, foyer_fiscaux
+    see https://openfisca.org/doc/simulate/run-simulation.html (part run simulation on data)
     """
 
     sb = SimulationBuilder()
@@ -53,17 +54,17 @@ def build_entity(data_persons, sb, nom_entite, nom_entite_pluriel, id_entite, id
     print("rôles acceptés par OpenFisca pour les " + nom_entite_pluriel, instance.entity.flattened_roles)
 
 
-    # join_with_persons accepte comme argument roles un tableau de str, on fait donc les recodages nécéssaires
+    # join_with_persons function need as input a string array so we recode it 
     data_persons[role_entite] = numpy.select(
         [data_persons[role_entite] == 0, data_persons[role_entite] == 1, data_persons[role_entite] == 2],
         [nom_role_0, nom_role_1, nom_role_2],
         default="anomalie"  
     )
 
-    # On associe chaque personne individuelle à son entité:
+    # We associate every individual to its role in the entity 
     sb.join_with_persons(instance, data_persons[id_entite_join], data_persons[role_entite])
 
-    # on vérifie que les rôles sont bien conformes aux rôles attendus 
+    # Check that roles are in the scope of the roles we expected  
     print("rôles de chacun dans son " + nom_entite, instance.members_role)
     assert("anomalie" not in instance.members_role)
 
