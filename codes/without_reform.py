@@ -107,7 +107,7 @@ def deal_with_married_couples(data_people):
 @click.command()
 @click.option('-y', '--beginning_year', default = None, type = int, required = True)
 @click.option('-e', '--end_year', default = -1, type = int, required = True)
-def simulate_sans_reforme(beginning_year = None, end_year = None):
+def simulate_without_reform(beginning_year = None, end_year = None):
     if end_year == -1:
         end_year = beginning_year + 1 #reform phased in over 2 years only 
 
@@ -116,6 +116,14 @@ def simulate_sans_reforme(beginning_year = None, end_year = None):
     data_people_brut = pandas.read_hdf(filename, key = "individu_{}".format(beginning_year))
     data_households_brut =  pandas.read_hdf(filename, key = "menage_{}".format(beginning_year))
     data_people = data_people_brut.merge(data_households_brut, right_index = True, left_on = "idmen", suffixes = ("", "_x"))
+
+    # check whether really needed here i don't think so really at the individual level not the foyer fiscal level
+    # Weight adjustment : wprm weights are for households, whereas we work on foyers fiscaux
+    # the idea in OpenFisca France-data is to say that individuals have the weight of their households (what is done in the left join above)
+    # and then summing over individuals of the foyer fiscal gives the weight of the foyer fiscal
+    sum_wprm_by_idfoy = data_people.groupby('idfoy')['wprm'].sum().reset_index()
+    sum_wprm_by_idfoy = sum_wprm_by_idfoy.rename(columns={'wprm': 'weight_foyerfiscal'})
+    data_people = pandas.merge(data_people, sum_wprm_by_idfoy, on='idfoy')
 
 
 
@@ -144,8 +152,6 @@ def simulate_sans_reforme(beginning_year = None, end_year = None):
     so that we can deduce T_after_reform(y) - T_before_reform(y)
 
     The only thing we need to do is to change y to get y_hat (account for inflation) : T_after_reform(y_hat) - T_before_reform(y)
-
-    TODO also deal with married couples : equal split of ALL earnings
     """
 
     # data we can get from INSEE website https://www.insee.fr/fr/statistiques/serie/001763852
@@ -154,16 +160,20 @@ def simulate_sans_reforme(beginning_year = None, end_year = None):
     inflation_coeff = (CPI[end_reform]-CPI[beginning_reform])/CPI[beginning_reform]
     print("Inflation coefficient", inflation_coeff)
 
+    earnings_columns = ["chomage_brut", "pensions_alimentaires_percues", "pensions_invalidite", "rag", "retraite_brute",
+                "ric", "rnc", "rpns_imposables", "salaire_de_base", "primes_fonction_publique", "traitement_indiciaire_brut"]
+
+
     for ma_variable in data_people.columns.tolist():
         if ma_variable not in ["idfam", "idfoy", "idmen", "noindiv", "quifam", "quifoy", "quimen", "wprm", "prest_precarite_hand",
                             "taux_csg_remplacement", "idmen_original", "idfoy_original", "idfam_original",
-                            "idmen_original_x", "idfoy_original_x", "idfam_original_x", "wprm", "prest_precarite_hand",
+                            "idmen_original_x", "idfoy_original_x", "idfam_original_x", "weight_foyerfiscal", "prest_precarite_hand",
                             "idmen_x", "idfoy_x", "idfam_x"]: #variables that cannot enter in a simulation (id, roles, weights...)
             
             if ma_variable not in ["loyer", "zone_apl", "statut_occupation_logement", "taxe_habitation", "logement_conventionne"]: # all variables at the individual level
                 simulation.set_input(ma_variable, beginning_reform, numpy.array(data_people[ma_variable]))
 
-                if ma_variable not in ["chomage_brut", "pensions_alimentaires_percues", "pensions_invalidite", "rag", "retraite_brute", "ric", "rnc", "rpns_imposables", "salaire_de_base", "primes_fonction_publique", "traitement_indiciaire_brut"]: #variables where no need to account for inflation
+                if ma_variable not in earnings_columns: #variables where no need to account for inflation
                     simulation.set_input(ma_variable, end_reform, numpy.array(data_people[ma_variable])) 
                 else: #here we account for inflation
                     simulation.set_input(ma_variable, end_reform, numpy.array(data_people[ma_variable])*(1+inflation_coeff))
@@ -174,14 +184,25 @@ def simulate_sans_reforme(beginning_year = None, end_year = None):
     
 
 
-    total_taxes = simulation.calculate('impot_revenu_restant_a_payer', beginning_reform)
-    print(total_taxes)
-    total_taxes2 = simulation.calculate('impot_revenu_restant_a_payer', end_reform)
-    print(total_taxes2)
+    total_taxes_before_reform = simulation.calculate('impot_revenu_restant_a_payer', beginning_reform)
+    print(total_taxes_before_reform)
+    total_taxes_after_reform = simulation.calculate('impot_revenu_restant_a_payer', end_reform)
+    print(total_taxes_after_reform)
+
+    tax_difference = total_taxes_after_reform - total_taxes_before_reform
+    data_people['tax_difference'] = tax_difference
+
+    # in our data we do not have capital revenue (rvcm) so we rank people according to their normal income
+    data_people['total_earning'] = data_people[earnings_columns].sum(axis=1)
+    data_people['earnings_rank'] = data_people['total_earning'].rank().astype(int)
+    print("data_people", data_people)
+
+    data_people.to_csv(f'excel/{beginning_reform}-{end_reform}/people_{beginning_reform}-{end_reform}.csv', index=False)
 
 
 
 
 
 
-simulate_sans_reforme()
+
+simulate_without_reform()
