@@ -71,6 +71,50 @@ def build_entity(data_persons, sb, nom_entite, nom_entite_pluriel, id_entite, id
     print("\n\n\n\n\n")
 
 
+
+def split_earnings(group):
+    married_mask = group['marital_status'] == 1
+    pacses_mask = group['marital_status'] == 5
+
+    if married_mask.any():
+        total_earning_married = group[married_mask]['earning'].sum()
+        num_married = married_mask.sum()
+        group.loc[married_mask, 'earning'] = total_earning_married / num_married
+    if pacses_mask.any():
+        total_earning_pacses = group[pacses_mask]['earning'].sum()
+        num_pacses = pacses_mask.sum()
+        group.loc[pacses_mask, 'earning'] = total_earning_pacses / num_pacses
+
+    return group
+
+# Applying the function to the DataFrame
+result_df = df.groupby('id_household').apply(split_earnings).reset_index(drop=True)
+
+print(result_df)
+
+def deal_with_married_couples(data_people):
+    """
+    Here are the statut_marital values:
+      1 - "Marié",
+      2 - "Célibataire",
+      3 - "Divorcé",
+      4 - "Veuf",
+      5 - "Pacsé",
+      6 - "Jeune veuf"
+    """
+    earnings_variables = ["chomage_brut", "pensions_alimentaires_percues", "pensions_invalidite",
+                      "rag", "retraite_brute", "ric", "rnc", "rpns_imposables", "salaire_de_base",
+                      "primes_fonction_publique", "traitement_indiciaire_brut"]
+    married_people = data_people[data_people['statut_marital'].isin([1,5])] 
+    print("married_people", married_people.head())
+    row_counts = married_people.groupby('idfoy').size().reset_index(name='num_married_people_by_foy')
+    print("row_counts", row_counts.head())
+
+    household_earnings = married_people.groupby('idfoy')[earnings_variables].sum().reset_index() # do for all earnings variables
+    print("households earnings", household_earnings)
+
+
+
 @click.command()
 @click.option('-y', '--beginning_year', default = None, type = int, required = True)
 @click.option('-e', '--end_year', default = -1, type = int, required = True)
@@ -78,6 +122,7 @@ def simulate_sans_reforme(beginning_year = None, end_year = None):
     if end_year == -1:
         end_year = beginning_year + 1 #reform phased in over 2 years only 
 
+    # load individuals and households data and combine the two datasets  
     filename = "../data/{}/openfisca_erfs_fpr_{}.h5".format(beginning_year, beginning_year)
     data_people_brut = pandas.read_hdf(filename, key = "individu_{}".format(beginning_year))
     data_households_brut =  pandas.read_hdf(filename, key = "menage_{}".format(beginning_year))
@@ -85,6 +130,8 @@ def simulate_sans_reforme(beginning_year = None, end_year = None):
 
     print("People data")
     print(data_people, "\n\n\n\n\n")
+
+    deal_with_married_couples(data_people)
 
     
     #####################################################
