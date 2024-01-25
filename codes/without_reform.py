@@ -72,27 +72,7 @@ def build_entity(data_persons, sb, nom_entite, nom_entite_pluriel, id_entite, id
 
 
 
-def split_earnings(group, variable_name):
-    married_mask = group['marital_status'] == 1
-    pacses_mask = group['marital_status'] == 5
 
-    # if num_married == 2, then performs equal split of the earnings between couples
-    
-    if married_mask.any():
-        total_earning_married = group[married_mask][variable_name].sum()
-        num_married = married_mask.sum()
-        group.loc[married_mask, variable_name] = total_earning_married / num_married
-    if pacses_mask.any():
-        total_earning_pacses = group[pacses_mask][variable_name].sum()
-        num_pacses = pacses_mask.sum()
-        group.loc[pacses_mask, variable_name] = total_earning_pacses / num_pacses
-
-    return group
-
-
-result_df = df.groupby('id_household').apply(split_earnings, variable_name='earning').reset_index(drop=True)
-
-print(result_df)
 
 def deal_with_married_couples(data_people):
     """
@@ -107,13 +87,11 @@ def deal_with_married_couples(data_people):
     earnings_variables = ["chomage_brut", "pensions_alimentaires_percues", "pensions_invalidite",
                       "rag", "retraite_brute", "ric", "rnc", "rpns_imposables", "salaire_de_base",
                       "primes_fonction_publique", "traitement_indiciaire_brut"]
-    married_people = data_people[data_people['statut_marital'].isin([1,5])] 
-    print("married_people", married_people.head())
-    row_counts = married_people.groupby('idfoy').size().reset_index(name='num_married_people_by_foy')
-    print("row_counts", row_counts.head())
+    print("data_people", data_people)
 
-    household_earnings = married_people.groupby('idfoy')[earnings_variables].sum().reset_index() # do for all earnings variables
-    print("households earnings", household_earnings)
+    
+
+    print("result_df", result_df)
 
 
 
@@ -188,17 +166,6 @@ def simulate_sans_reforme(beginning_year = None, end_year = None):
     print(total_taxes)
     total_taxes2 = simulation.calculate('impot_revenu_restant_a_payer', end_reform)
     print(total_taxes2)
-
-
-
-
-
-
-
-
-
-
-
 
 
 
