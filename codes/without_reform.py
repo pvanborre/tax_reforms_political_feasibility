@@ -9,7 +9,6 @@ from openfisca_france import FranceTaxBenefitSystem
 pandas.options.display.max_columns = None
 
 
-
 def initialize_simulation(tax_benefit_system, data_persons):
     """
     Declares all 4 types of OpenFisca : individuals, households, families, foyer_fiscaux
@@ -98,7 +97,7 @@ def deal_with_married_couples(data_people):
     single_df = data_people[data_people['statut_marital'] != 1]
     final_df = pandas.concat([single_df, married_augmented_df]).sort_values(by='idfoy')
 
-    print("final_df", final_df)
+    #print("final_df", final_df)
     return final_df
 
 
@@ -117,15 +116,8 @@ def simulate_without_reform(beginning_year = None, end_year = None):
     data_households_brut =  pandas.read_hdf(filename, key = "menage_{}".format(beginning_year))
     data_people = data_people_brut.merge(data_households_brut, right_index = True, left_on = "idmen", suffixes = ("", "_x"))
 
-    # check whether really needed here i don't think so really at the individual level not the foyer fiscal level
-    # Weight adjustment : wprm weights are for households, whereas we work on foyers fiscaux
-    # the idea in OpenFisca France-data is to say that individuals have the weight of their households (what is done in the left join above)
-    # and then summing over individuals of the foyer fiscal gives the weight of the foyer fiscal
-    sum_wprm_by_idfoy = data_people.groupby('idfoy')['wprm'].sum().reset_index()
-    sum_wprm_by_idfoy = sum_wprm_by_idfoy.rename(columns={'wprm': 'weight_foyerfiscal'})
-    data_people = pandas.merge(data_people, sum_wprm_by_idfoy, on='idfoy')
-
-
+    # remark : the idea in OpenFisca France-data is to say that individuals have the weight of their households (what is done in the left join above)
+    # but we work here at the indiviudal level so no need to construct a foyer fiscal weight 
 
     # perform equal split of earnings within couples 
     data_people = deal_with_married_couples(data_people)
@@ -144,6 +136,7 @@ def simulate_without_reform(beginning_year = None, end_year = None):
     end_reform = str(end_year) 
     print("Years under consideration", beginning_reform, end_reform)
 
+    # only household information
     data_households = data_people.drop_duplicates(subset='idmen', keep='first')
 
     """
@@ -183,18 +176,30 @@ def simulate_without_reform(beginning_year = None, end_year = None):
                 simulation.set_input(ma_variable, end_reform, numpy.array(data_households[ma_variable]))
     
 
-
+    # the thing is that tax is computed at the foyer_fiscal level and we are working at the individual level
+    # so to individualize we divide tax by 2 for couples
+                
     total_taxes_before_reform = simulation.calculate('impot_revenu_restant_a_payer', beginning_reform)
-    print(total_taxes_before_reform)
+    print("taxes before reform (foyer fiscal level)", total_taxes_before_reform)
     total_taxes_after_reform = simulation.calculate('impot_revenu_restant_a_payer', end_reform)
-    print(total_taxes_after_reform)
+    print("taxes after reform (foyer fiscal level)", total_taxes_after_reform)
 
-    tax_difference = total_taxes_after_reform - total_taxes_before_reform
-    #data_people['tax_difference'] = tax_difference
-    # huge problem here : data_people individual level whereas tax at the foyer_fiscal level
-    # solution : put each individual in its own foyer fiscal
+    maries_ou_pacses = simulation.calculate('maries_ou_pacses', beginning_reform) # we take marital status before the reform, what if it changes during the reform ?
+    total_taxes_before_reform[maries_ou_pacses] /= 2 #equal split between couples also of the tax 
+    total_taxes_after_reform[maries_ou_pacses] /= 2
 
-    # in our data we do not have capital revenue (rvcm) so we rank people according to their normal income
+    tax_difference = -total_taxes_after_reform + total_taxes_before_reform #impot_revenu_restant_a_payer is negative in the model
+
+ 
+    data_foyerfiscaux = pandas.DataFrame()
+    data_foyerfiscaux['idfoy'] = numpy.arange(len(total_taxes_after_reform))
+    data_foyerfiscaux['tax_difference'] = tax_difference
+
+    data_people = pandas.merge(data_people, data_foyerfiscaux, on='idfoy', how = 'left')
+
+    # in our data we do not have capital revenue (rvcm in OpenFisca) 
+    # so we just rank people according to their normal income 
+    # (otherwise we would have removed capital earning since they are not a regular stream of income)
     data_people['total_earning'] = data_people[earnings_columns].sum(axis=1)
     data_people['earnings_rank'] = data_people['total_earning'].rank().astype(int)
     print("data_people", data_people)
