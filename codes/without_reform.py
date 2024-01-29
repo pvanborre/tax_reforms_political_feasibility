@@ -22,17 +22,14 @@ def modify_parameters(parameters):
 
 
 class modify_parameters_2003(Reform):
-    name = "we code the reform new_tax = old_tax + τ1 primary_earning + τ2 secondary_earning"
+    name = "we apply the parameters modification for year 2003"
     def apply(self):
-        # we apply the parameters modification for year 2003
         self.modify_parameters(modifier_function = modify_parameters)
 
 
 
 
-
-
-def initialize_simulation(tax_benefit_system, data_persons):
+def initialize_simulation(tax_benefit_system, data_people):
     """
     Declares all 4 types of OpenFisca : individuals, households, families, foyer_fiscaux
     see https://openfisca.org/doc/simulate/run-simulation.html (part run simulation on data)
@@ -45,18 +42,18 @@ def initialize_simulation(tax_benefit_system, data_persons):
     # roles within these entities : quimen, quifoy et quifam 
 
     # individuals
-    sb.declare_person_entity('individu', data_persons.noindiv)
+    sb.declare_person_entity('individu', data_people.noindiv)
 
     # households 
-    build_entity(data_persons, sb, nom_entite = "menage", nom_entite_pluriel = "menages", id_entite = "idmen", id_entite_join = "idmen_original",
+    build_entity(data_people, sb, nom_entite = "menage", nom_entite_pluriel = "menages", id_entite = "idmen", id_entite_join = "idmen_original",
                    role_entite = "quimen", nom_role_0 = "personne_de_reference", nom_role_1 = "conjoint", nom_role_2 = "enfant")
     
     # foyers fiscaux
-    build_entity(data_persons, sb, nom_entite = "foyer_fiscal", nom_entite_pluriel = "foyers fiscaux", id_entite = "idfoy", id_entite_join = "idfoy",
+    build_entity(data_people, sb, nom_entite = "foyer_fiscal", nom_entite_pluriel = "foyers fiscaux", id_entite = "idfoy", id_entite_join = "idfoy",
                    role_entite = "quifoy", nom_role_0 = "declarant_principal", nom_role_1 = "conjoint", nom_role_2 = "personne_a_charge")
     
     # families
-    build_entity(data_persons, sb, nom_entite = "famille", nom_entite_pluriel = "familles", id_entite = "idfam", id_entite_join = "idfam",
+    build_entity(data_people, sb, nom_entite = "famille", nom_entite_pluriel = "familles", id_entite = "idfam", id_entite_join = "idfam",
                    role_entite = "quifam", nom_role_0 = "demandeur", nom_role_1 = "conjoint", nom_role_2 = "enfant")
 
     simulation = sb.build(tax_benefit_system)
@@ -98,13 +95,13 @@ def build_entity(data_persons, sb, nom_entite, nom_entite_pluriel, id_entite, id
 
 def deal_with_married_couples(data_people, earnings_variables):
     """
+    The goal of this function is to perform equal split of earnings between couples (equal split couples)
+
     Here are the statut_marital values: (see https://github.com/openfisca/openfisca-france-data/blob/6f7af1a194baf07ab4cfacb6ce1d4e817d9913b8/openfisca_france_data/erfs_fpr/input_data_builder/step_03_variables_individuelles.py#L929 )
       1 - "Marié",
       2 - "Célibataire",
       3 - "Divorcé",
       4 - "Veuf"
-
-    The goal of this function is to perform equal split of earnings between couples (equal split couples)
     """
 
     married_df = data_people[data_people['statut_marital'] == 1]
@@ -117,7 +114,6 @@ def deal_with_married_couples(data_people, earnings_variables):
     single_df = data_people[data_people['statut_marital'] != 1]
     final_df = pandas.concat([single_df, married_augmented_df]).sort_values(by='idfoy')
 
-    #print("final_df", final_df)
     return final_df
 
 
@@ -128,7 +124,7 @@ def deal_with_married_couples(data_people, earnings_variables):
 @click.option('-e', '--end_year', default = -1, type = int, required = True)
 def simulate_without_reform(beginning_year = None, end_year = None):
     if end_year == -1:
-        end_year = beginning_year + 1 #reform phased in over 2 years only 
+        end_year = beginning_year + 1 #reform phased over 2 years only 
 
     # load individuals and households data and combine the two datasets  
     filename = "../data/{}/openfisca_erfs_fpr_{}.h5".format(beginning_year, beginning_year)
@@ -137,9 +133,9 @@ def simulate_without_reform(beginning_year = None, end_year = None):
     data_people = data_people_brut.merge(data_households_brut, right_index = True, left_on = "idmen", suffixes = ("", "_x"))
 
     # remark : the idea in OpenFisca France-data is to say that individuals have the weight of their households (what is done in the left join above)
-    # but we work here at the indiviudal level so no need to construct a foyer fiscal weight 
+    # (but we work here at the indiviudal level so no need to construct a foyer fiscal weight)
 
-    if beginning_year<=2013:
+    if beginning_year <= 2013: #there is no pensions_invalidite
         earnings_columns = ["chomage_brut", "pensions_alimentaires_percues", "rag", "retraite_brute",
             "ric", "rnc", "rpns_imposables", "salaire_de_base", "primes_fonction_publique", "traitement_indiciaire_brut"]
 
@@ -163,6 +159,7 @@ def simulate_without_reform(beginning_year = None, end_year = None):
         tax_benefit_system = FranceTaxBenefitSystem()
 
     simulation = initialize_simulation(tax_benefit_system, data_people)
+
     beginning_reform = str(beginning_year)
     end_reform = str(end_year) 
     print("Years under consideration", beginning_reform, end_reform)
@@ -171,7 +168,7 @@ def simulate_without_reform(beginning_year = None, end_year = None):
     data_households = data_people.drop_duplicates(subset='idmen', keep='first')
 
     """
-    Here we use the same simulation, that is same people with same variables
+    Here we use the same simulation, that is the same people with same variables
     And we compute its tax for another year 
     so that we can deduce T_after_reform(y) - T_before_reform(y)
 
@@ -219,12 +216,15 @@ def simulate_without_reform(beginning_year = None, end_year = None):
 
     tax_difference = -total_taxes_after_reform + total_taxes_before_reform #impot_revenu_restant_a_payer is negative in the model
 
- 
+    # we store information at the foyer fiscal level
     data_foyerfiscaux = pandas.DataFrame()
     data_foyerfiscaux['idfoy'] = numpy.arange(len(total_taxes_after_reform))
     data_foyerfiscaux['tax_difference'] = tax_difference
 
+    # we add this foyer fiscal information to the individual level : 
+    # need to discard children otherwise children considered as paying the taxes of their foyer fiscal
     data_people = pandas.merge(data_people, data_foyerfiscaux, on='idfoy', how = 'left')
+    data_people = data_people[data_people["age"] >= 18]
 
     # in our data we do not have capital revenue (rvcm in OpenFisca) 
     # so we just rank people according to their normal income 
@@ -233,10 +233,7 @@ def simulate_without_reform(beginning_year = None, end_year = None):
     data_people['earnings_rank'] = data_people['total_earning'].rank().astype(int)
     print("data_people", data_people)
 
-    data_people.to_csv(f'excel/{beginning_reform}-{end_reform}/people_{beginning_reform}-{end_reform}.csv', index=False)
-
-
-
+    data_people.to_csv(f'excel/{beginning_reform}-{end_reform}/people_adults_{beginning_reform}-{end_reform}.csv', index=False)
 
 
 
