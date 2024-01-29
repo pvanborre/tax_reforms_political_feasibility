@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from scipy.stats import gaussian_kde
 
 import seaborn as sns
 
@@ -140,8 +141,21 @@ def increased_progressivity(df, beginning_year, end_year):
     plt.close()
 
 
+def pareto_bounds(df, beginning_year, end_year):
+    """
+    Plots Pareto Bounds
+    D_up = (1 - cdf)/y.pdf * 1/ETI
+    """
 
+    work_df = df.copy()
+    work_df.sort_values(by="total_earning", inplace=True)
 
+    # Calculate kernel density estimate (KDE)
+    kde = gaussian_kde(work_df["total_earning"].values, weights=work_df["wprm"].values)
+    work_df["pdf"] = kde(work_df["total_earning"].values)
+
+    # Calculate cumulative distribution function (CDF)
+    work_df["cdf"] = np.cumsum(work_df["pdf"]) / np.sum(work_df["pdf"])
 
 
 
@@ -174,6 +188,9 @@ def main_function(beginning_year = None, end_year = None):
 
     # then plot T'/(1-T') to see whether increased progressivity in the middle 
     increased_progressivity(work_df, beginning_year, end_year)
+
+    # plot pareto Bounds
+    pareto_bounds(work_df, beginning_year, end_year)
 
         
 main_function()
