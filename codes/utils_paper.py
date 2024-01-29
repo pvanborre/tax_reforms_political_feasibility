@@ -164,21 +164,9 @@ def pareto_bounds(df, beginning_year, end_year):
         upper_bound = base_upper_bound * 1/ETI
         plt.plot(grid_earnings, upper_bound, label='CDF')
 
-
-    tax_ratio = (work_df["marginal_tax_rate_before_reform"]/(1 - work_df["marginal_tax_rate_before_reform"])).values
-    earning = work_df["total_earning"].values
-    weights = work_df["wprm"].values
-
-    unique_earning = np.unique(earning)
-    mean_tax_rates = np.zeros_like(unique_earning, dtype=float)
-
-    for i, unique_value in enumerate(unique_earning):
-        indices = np.where(earning == unique_value)
-        mean_tax_rate = np.average(tax_ratio[indices], weights=weights[indices])
-        mean_tax_rates[i] = mean_tax_rate
-
-    plt.plot(unique_earning[unique_earning <= np.percentile(work_df['total_earning'].values, 90)], mean_tax_rates[unique_earning <= np.percentile(work_df['total_earning'].values, 90)]) 
-
+    work_df["tax_ratio_before"] = 100*work_df["marginal_tax_rate_before_reform"]/(1 - work_df["marginal_tax_rate_before_reform"])
+    plt.plot(work_df["total_earning"], work_df["tax_ratio_before"])
+    
     plt.title('Upper Pareto Bound')  
     plt.show()
     plt.savefig('../outputs/upper_pareto_bound/upper_pareto_bound_{beginning_year}-{end_year}.png'.format(beginning_year = beginning_year, end_year = end_year))
