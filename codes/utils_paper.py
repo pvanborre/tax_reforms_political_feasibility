@@ -12,15 +12,18 @@ pd.options.display.max_columns = None
 def tax_liability_difference(work_df, beginning_year, end_year):
     """
     Computes the average per decile of T_1(y_hat) - T_0(y)
-    TODO here use the approach of the average as in the following function ??
+    We could have worked on tax_difference but to be consistent with the following functions we work with : 
+    t1*y0 - t0*y0
     """
 
+    work_df["difference_recomputed"] = (work_df["average_tax_rate_after_reform"] - work_df["average_tax_rate_before_reform"])*work_df["total_earning"]
+
     # per decile, we compute the average of tax difference, that is of T_1(y_hat) - T_0(y) 
-    result = work_df.groupby('quantile').apply(lambda x: np.average(x['tax_difference'], weights=x['wprm']))
+    result = work_df.groupby('quantile').apply(lambda x: np.average(x['difference_recomputed'], weights=x['wprm']))
 
     # We fit a quadratic polynomial to the original data
     x_values = 10*work_df["cum_weight"]/work_df['wprm'].sum() #*10 to be in [0,10]
-    y_values = work_df["tax_difference"]
+    y_values = work_df["difference_recomputed"]
     coefficients = np.polyfit(x_values, y_values, 2)
     poly = np.poly1d(coefficients)
     x_interpolated = np.linspace(0, 10, 1000)   # 0 here, not 1
@@ -42,7 +45,7 @@ def tax_liability_difference(work_df, beginning_year, end_year):
 
 
     plt.figure(figsize=(10, 6))
-    sns.boxplot(x='quantile', y='tax_difference', data=work_df, showfliers=False)
+    sns.boxplot(x='quantile', y='difference_recomputed', data=work_df, showfliers=False)
 
 
     plt.title('Boxplot per Decile')
@@ -98,16 +101,46 @@ def beneficiary_reform(df, list_ETI, beginning_year, end_year):
         plt.scatter(100*number_winner_median, 100*number_winner, label=ETI)
 
     x = np.linspace(0,100,100)
-    plt.plot(x, x) # todo dashed 
+    plt.plot(x, x, linestyle='--') 
     plt.hlines(y = 50, xmin = 0, xmax = 100)
     plt.vlines(x = 50, ymin = 0, ymax = 100)
     plt.title('Majority Support versus Support by the Median Voter')
+    plt.xlabel('Median support')
+    plt.ylabel('Whole population support')
     plt.xlim(0,100)
     plt.ylim(0,100)
     plt.legend() 
     plt.show()
     plt.savefig('../outputs/alignment_support/alignment_support_{beginning_year}-{end_year}.png'.format(beginning_year = beginning_year, end_year = end_year))
     plt.close()
+
+
+def increased_progressivity(df, beginning_year, end_year):
+    """
+    Computes the average per decile of T'/(1-T') where T' marginal tax rate
+    """
+
+    # per decile, we compute the average of T'/(1-T')
+    df["tax_ratio_before"] = df["marginal_tax_rate_before_reform"]/(1 - df["marginal_tax_rate_before_reform"])
+    df["tax_ratio_after"] = df["marginal_tax_rate_after_reform"]/(1 - df["marginal_tax_rate_after_reform"])
+    result_before = df.groupby('quantile').apply(lambda x: np.average(x['tax_ratio_before'], weights=x['wprm']))
+    result_after = df.groupby('quantile').apply(lambda x: np.average(x['tax_ratio_after'], weights=x['wprm']))
+
+
+    plt.figure()
+    plt.scatter(result_before.index, result_before.values, c = "blue", label = beginning_year)
+    plt.scatter(result_after.index, result_after.values, c = "red", label = end_year)
+
+    plt.xlabel('Quantile')
+    plt.ylabel('Average Tax Ratio')
+    plt.xticks(range(1, 11))  
+    plt.legend()
+    plt.show()
+    plt.savefig('../outputs/increased_progressivity/increased_progressivity_{beginning_year}-{end_year}.png'.format(beginning_year = beginning_year, end_year = end_year))
+    plt.close()
+
+
+
 
 
 
@@ -138,6 +171,9 @@ def main_function(beginning_year = None, end_year = None):
     # Then look at whether people were beneficiaries or losers of a reform 
     list_ETI = [0., 0.25, 1., 1.25]
     beneficiary_reform(work_df, list_ETI, beginning_year, end_year)
+
+    # then plot T'/(1-T') to see whether increased progressivity in the middle 
+    increased_progressivity(work_df, beginning_year, end_year)
 
         
 main_function()
