@@ -243,11 +243,21 @@ def simulate_without_reform(beginning_year = None, end_year = None):
 
     data_people = data_people[data_people["age"] >= 18]
 
+
+
     # in our data we do not have capital revenue (rvcm in OpenFisca) 
     # so we just rank people according to their normal income 
     # (otherwise we would have removed capital earning since they are not a regular stream of income)
     data_people['total_earning'] = data_people[earnings_columns].sum(axis=1)
     data_people['earnings_rank'] = data_people['total_earning'].rank().astype(int)
+
+
+    list_ETI = [0., 0.25, 1., 1.25]
+    for ETI in list_ETI:
+        data_people[f"total_earning_after_reform_{ETI}"] = (1 - (data_people["average_tax_rate_after_reform"]-data_people["marginal_tax_rate_before_reform"])/(1 - data_people["marginal_tax_rate_before_reform"])*ETI)*data_people["total_earning"]
+        data_people[f'individual_revenue_effect_{ETI}'] = data_people["average_tax_rate_after_reform"]*data_people[f"total_earning_after_reform_{ETI}"] - data_people['average_tax_rate_before_reform']*data_people["total_earning"]
+
+
     print("data_people", data_people)
 
     data_people.to_csv(f'excel/{beginning_reform}-{end_reform}/people_adults_{beginning_reform}-{end_reform}.csv', index=False)
