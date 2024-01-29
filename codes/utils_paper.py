@@ -47,18 +47,17 @@ def tax_liability_difference(df, beginning_year, end_year):
     plt.close()
 
 
-    quartiles = [total_weight/4*i for i in range(1,5)]
-    work_df['quartile'] = np.searchsorted(quartiles, work_df['cum_weight']) + 1
-    work_df.loc[work_df['cum_weight'] > quartiles[-1], 'quartile'] = 4
-    result2 = work_df.groupby(['quantile', 'quartile']).apply(lambda x: np.average(x['tax_difference'], weights=x['wprm']))
-    print(result2)
+    for decile in range(1, 11):
+        decile_data = work_df[work_df['quantile'] == decile].copy()
 
-    # Create quartile bins within each quantile
-    work_df['quartile'] = work_df.groupby('quantile')['tax_difference'].transform(lambda x: pd.qcut(x, q=[0, 0.25, 0.5, 0.75, 1], labels=False))
-    print(work_df)
-    # Create the weighted boxplot
-    plt.figure(figsize=(10, 6))
-    sns.boxplot(x='quantile', y='difference', hue='quartile', data=df, showfliers=False)
+        width = decile_data['cum_weight'].max() - decile_data['cum_weight'].min()
+        quartiles = [decile_data['cum_weight'].min() + width / 4 * i for i in range(1, 5)]
+        decile_data['quartile'] = np.searchsorted(quartiles, decile_data['cum_weight']) + 1
+        decile_data.loc[decile_data['cum_weight'] > quartiles[-1], 'quartile'] = 4
+
+        result2 = decile_data.groupby(['quantile', 'quartile']).apply(lambda x: np.average(x['tax_difference'], weights=x['wprm']))
+        
+        print(f"Decile {decile}:\n{result2}\n")
 
 
     plt.figure(figsize=(10, 6))
