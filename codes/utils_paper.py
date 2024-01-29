@@ -71,8 +71,9 @@ def beneficiary_reform(df, list_ETI, beginning_year, end_year):
         df['max_difference'] = np.maximum(df['difference_after'], df['difference_before'])
         
         total_revenue_effect = np.average(df[f'individual_revenue_effect_{ETI}'], weights=df['wprm'])
-        # print(ETI, total_revenue_effect, np.average(df["max_difference"], weights=df["wprm"]))
         df["reform_effect"] = df['max_difference'] - total_revenue_effect
+
+        df[f"winner_{ETI}"] = (df["reform_effect"] <= 0)
 
         df_results[ETI] = df.groupby('quantile').apply(lambda x: np.average(x['reform_effect'], weights=x['wprm']))
 
@@ -86,6 +87,29 @@ def beneficiary_reform(df, list_ETI, beginning_year, end_year):
     plt.show()
     plt.savefig('../outputs/beneficiaries_decile/beneficiaries_decile_{beginning_year}-{end_year}.png'.format(beginning_year = beginning_year, end_year = end_year))
     plt.close()
+
+    plt.figure()
+    total_weight = df['wprm'].sum()
+    median_df = df[(df["cum_weight"] >= 0.45*total_weight) & (df["cum_weight"] <= 0.55*total_weight)]
+
+    for ETI in list_ETI:
+        number_winner = np.average(df[f"winner_{ETI}"], weights=df['wprm'])
+        number_winner_median = np.average(median_df[f"winner_{ETI}"], weights=median_df['wprm'])
+        plt.scatter(100*number_winner_median, 100*number_winner, label=ETI)
+
+    x = np.linspace(0,100,100)
+    plt.plot(x, x) # todo dashed 
+    plt.hlines(y = 50, xmin = 0, xmax = 100)
+    plt.vlines(x = 50, ymin = 0, ymax = 100)
+    plt.title('Majority Support versus Support by the Median Voter')
+    plt.xlim(0,100)
+    plt.ylim(0,100)
+    plt.legend() 
+    plt.show()
+    plt.savefig('../outputs/alignment_support/alignment_support_{beginning_year}-{end_year}.png'.format(beginning_year = beginning_year, end_year = end_year))
+    plt.close()
+
+
 
 
 @click.command()
