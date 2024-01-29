@@ -12,16 +12,18 @@ pd.options.display.max_columns = None
 def tax_liability_difference(work_df, beginning_year, end_year):
     """
     Computes the average per decile of T_1(y_hat) - T_0(y)
-    TODO here use the approach of the average as in the following function ??
-    Yes i think so... (be coherent between all functions)
+    We could have worked on tax_difference but to be consistent with the following functions we work with : 
+    t1*y0 - t0*y0
     """
 
+    work_df["difference_recomputed"] = (work_df["average_tax_rate_after_reform"] - work_df["average_tax_rate_before_reform"])*work_df["total_earning"]
+
     # per decile, we compute the average of tax difference, that is of T_1(y_hat) - T_0(y) 
-    result = work_df.groupby('quantile').apply(lambda x: np.average(x['tax_difference'], weights=x['wprm']))
+    result = work_df.groupby('quantile').apply(lambda x: np.average(x['difference_recomputed'], weights=x['wprm']))
 
     # We fit a quadratic polynomial to the original data
     x_values = 10*work_df["cum_weight"]/work_df['wprm'].sum() #*10 to be in [0,10]
-    y_values = work_df["tax_difference"]
+    y_values = work_df["difference_recomputed"]
     coefficients = np.polyfit(x_values, y_values, 2)
     poly = np.poly1d(coefficients)
     x_interpolated = np.linspace(0, 10, 1000)   # 0 here, not 1
@@ -43,7 +45,7 @@ def tax_liability_difference(work_df, beginning_year, end_year):
 
 
     plt.figure(figsize=(10, 6))
-    sns.boxplot(x='quantile', y='tax_difference', data=work_df, showfliers=False)
+    sns.boxplot(x='quantile', y='difference_recomputed', data=work_df, showfliers=False)
 
 
     plt.title('Boxplot per Decile')
