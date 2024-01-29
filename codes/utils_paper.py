@@ -149,13 +149,40 @@ def pareto_bounds(df, beginning_year, end_year):
 
     work_df = df.copy()
     work_df.sort_values(by="total_earning", inplace=True)
-
-    # Calculate kernel density estimate (KDE)
+    work_df = work_df[work_df["total_earning"] > 0] # for this function we remove null earnings otherwise problem with grid and estimates
     kde = gaussian_kde(work_df["total_earning"].values, weights=work_df["wprm"].values)
-    work_df["pdf"] = kde(work_df["total_earning"].values)
 
-    # Calculate cumulative distribution function (CDF)
-    work_df["cdf"] = np.cumsum(work_df["pdf"]) / np.sum(work_df["pdf"])
+    grid_earnings = np.linspace(np.percentile(work_df['total_earning'].values, 1), np.percentile(work_df['total_earning'].values, 90), 1000)
+    pdf = kde(grid_earnings)
+    cdf = np.cumsum(pdf) / np.sum(pdf)
+    
+    plt.figure()
+    list_ETI = [0.25, 0.4, 0.5, 0.75, 1., 1.25]
+    base_upper_bound = (1 - cdf)/(grid_earnings * pdf) 
+    
+    for ETI in list_ETI:
+        upper_bound = base_upper_bound * 1/ETI
+        plt.plot(grid_earnings, upper_bound, label='CDF')
+
+
+    tax_ratio = (work_df["marginal_tax_rate_before_reform"]/(1 - work_df["marginal_tax_rate_before_reform"])).values
+    earning = work_df["total_earning"].values
+    weights = work_df["wprm"].values
+
+    unique_earning = np.unique(earning)
+    mean_tax_rates = np.zeros_like(unique_earning, dtype=float)
+
+    for i, unique_value in enumerate(unique_earning):
+        indices = np.where(earning == unique_value)
+        mean_tax_rate = np.average(tax_ratio[indices], weights=weights[indices])
+        mean_tax_rates[i] = mean_tax_rate
+
+    plt.plot(unique_earning[unique_earning <= np.percentile(work_df['total_earning'].values, 90)], mean_tax_rates[unique_earning <= np.percentile(work_df['total_earning'].values, 90)]) 
+
+    plt.title('Upper Pareto Bound')  
+    plt.show()
+    plt.savefig('../outputs/upper_pareto_bound/upper_pareto_bound_{beginning_year}-{end_year}.png'.format(beginning_year = beginning_year, end_year = end_year))
+    plt.close()
 
 
 
