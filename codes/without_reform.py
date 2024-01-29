@@ -254,7 +254,7 @@ def simulate_without_reform(beginning_year = None, end_year = None):
 
     list_ETI = [0., 0.25, 1., 1.25]
     for ETI in list_ETI:
-        data_people[f"total_earning_after_reform_{ETI}"] = (1 - (data_people["average_tax_rate_after_reform"]-data_people["marginal_tax_rate_before_reform"])/(1 - data_people["marginal_tax_rate_before_reform"])*ETI)*data_people["total_earning"]
+        data_people[f"total_earning_after_reform_{ETI}"] = (1 - (data_people["marginal_tax_rate_after_reform"]-data_people["marginal_tax_rate_before_reform"])/(1 - data_people["marginal_tax_rate_before_reform"])*ETI)*data_people["total_earning"]
         data_people[f'individual_revenue_effect_{ETI}'] = data_people["average_tax_rate_after_reform"]*data_people[f"total_earning_after_reform_{ETI}"] - data_people['average_tax_rate_before_reform']*data_people["total_earning"]
 
 

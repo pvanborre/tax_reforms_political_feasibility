@@ -6,6 +6,7 @@ import seaborn as sns
 
 import click
 
+pd.options.display.max_columns = None
 
 
 def tax_liability_difference(work_df, beginning_year, end_year):
@@ -70,10 +71,9 @@ def beneficiary_reform(df, list_ETI, beginning_year, end_year):
         df['max_difference'] = np.maximum(df['difference_after'], df['difference_before'])
         
         total_revenue_effect = np.average(df[f'individual_revenue_effect_{ETI}'], weights=df['wprm'])
+        # print(ETI, total_revenue_effect, np.average(df["max_difference"], weights=df["wprm"]))
         df["reform_effect"] = df['max_difference'] - total_revenue_effect
 
-
-        # per decile, we compute the average of tax difference, that is of T_1(y_hat) - T_0(y) 
         df_results[ETI] = df.groupby('quantile').apply(lambda x: np.average(x['reform_effect'], weights=x['wprm']))
 
     plt.figure()
