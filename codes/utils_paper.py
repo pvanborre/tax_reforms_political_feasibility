@@ -2,12 +2,23 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
+import seaborn as sns
+
 import click
 
+def reindex_df(df, weight_col):
+    """expand the dataframe to prepare for resampling
+    result is 1 row per count per sample"""
+    df = df.reindex(df.index.repeat(df[weight_col]))
+    df.reset_index(drop=True, inplace=True)
+    return(df)
 
-
-def weighted_mean_tax_difference(df):
-    return np.average(df['tax_difference'], weights=df['wprm'])
+def weighted_boxplot(df, weight_col):
+    # https://stackoverflow.com/questions/58053594/how-to-create-a-boxplot-from-data-with-weights
+    sns.boxplot(x='quantile', 
+                y='tax_difference', 
+                data=reindex_df(df, weight_col = weight_col))
+    
 
 
 def tax_liability_difference(df, beginning_year, end_year):
@@ -25,7 +36,7 @@ def tax_liability_difference(df, beginning_year, end_year):
     work_df.loc[work_df['cum_weight'] > quantiles[-1], 'quantile'] = 10
 
     # per decile, we compute the average of tax difference, that is of T_1(y_hat) - T_0(y) 
-    result = work_df.groupby('quantile').apply(weighted_mean_tax_difference)
+    result = work_df.groupby('quantile').apply(lambda x: np.average(x['tax_difference'], weights=x['wprm']))
 
     # We fit a quadratic polynomial to the original data
     x_values = 10*work_df["cum_weight"]/total_weight #*10 to be in [0,10]
@@ -36,7 +47,7 @@ def tax_liability_difference(df, beginning_year, end_year):
     y_interpolated = poly(x_interpolated)
 
 
-
+    plt.figure()
     plt.scatter(result.index, result.values)
     plt.plot(x_interpolated, y_interpolated, label='Quadratic Polynomial Fit', color='red')
     plt.xlabel('Quantile')
@@ -47,6 +58,20 @@ def tax_liability_difference(df, beginning_year, end_year):
     plt.show()
     plt.savefig('../outputs/tax_liability_difference/tax_liability_difference_{beginning_year}-{end_year}.png'.format(beginning_year = beginning_year, end_year = end_year))
     plt.close()
+
+    plt.figure(figsize=(10, 6))
+    #sns.boxplot(x='quantile', y='tax_difference', data=work_df, showfliers=False)
+    weighted_boxplot(work_df, 'wprm')
+
+    plt.title('Boxplot per Decile')
+    plt.xlabel('Decile')
+    plt.ylabel('Tax Difference')
+    plt.xticks(range(1, 11))  
+    plt.show()
+    plt.savefig('../outputs/tax_liability_difference_boxplot/tax_liability_difference_boxplot_{beginning_year}-{end_year}.png'.format(beginning_year = beginning_year, end_year = end_year))
+    plt.close()
+
+    
 
 
 
