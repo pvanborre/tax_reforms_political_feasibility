@@ -47,18 +47,6 @@ def tax_liability_difference(df, beginning_year, end_year):
     plt.close()
 
 
-    for decile in range(1, 11):
-        decile_data = work_df[work_df['quantile'] == decile].copy()
-
-        width = decile_data['cum_weight'].max() - decile_data['cum_weight'].min()
-        quartiles = [decile_data['cum_weight'].min() + width / 4 * i for i in range(1, 5)]
-        decile_data['quartile'] = np.searchsorted(quartiles, decile_data['cum_weight']) + 1
-        decile_data.loc[decile_data['cum_weight'] > quartiles[-1], 'quartile'] = 4
-
-        result2 = decile_data.groupby(['quantile', 'quartile']).apply(lambda x: np.average(x['tax_difference'], weights=x['wprm']))
-        
-        print(f"Decile {decile}:\n{result2}\n")
-
 
     plt.figure(figsize=(10, 6))
     sns.boxplot(x='quantile', y='tax_difference', data=work_df, showfliers=False)
