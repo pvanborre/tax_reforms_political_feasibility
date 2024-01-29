@@ -6,19 +6,6 @@ import seaborn as sns
 
 import click
 
-def reindex_df(df, weight_col):
-    """expand the dataframe to prepare for resampling
-    result is 1 row per count per sample"""
-    df = df.reindex(df.index.repeat(df[weight_col]))
-    df.reset_index(drop=True, inplace=True)
-    return(df)
-
-def weighted_boxplot(df, weight_col):
-    # https://stackoverflow.com/questions/58053594/how-to-create-a-boxplot-from-data-with-weights
-    sns.boxplot(x='quantile', 
-                y='tax_difference', 
-                data=reindex_df(df, weight_col = weight_col))
-    
 
 
 def tax_liability_difference(df, beginning_year, end_year):
@@ -59,9 +46,24 @@ def tax_liability_difference(df, beginning_year, end_year):
     plt.savefig('../outputs/tax_liability_difference/tax_liability_difference_{beginning_year}-{end_year}.png'.format(beginning_year = beginning_year, end_year = end_year))
     plt.close()
 
+
+    quartiles = [total_weight/4*i for i in range(1,5)]
+    work_df['quartile'] = np.searchsorted(quartiles, work_df['cum_weight']) + 1
+    work_df.loc[work_df['cum_weight'] > quartiles[-1], 'quartile'] = 4
+    result2 = work_df.groupby(['quantile', 'quartile']).apply(lambda x: np.average(x['tax_difference'], weights=x['wprm']))
+    print(result2)
+
+    # Create quartile bins within each quantile
+    work_df['quartile'] = work_df.groupby('quantile')['tax_difference'].transform(lambda x: pd.qcut(x, q=[0, 0.25, 0.5, 0.75, 1], labels=False))
+    print(work_df)
+    # Create the weighted boxplot
     plt.figure(figsize=(10, 6))
-    #sns.boxplot(x='quantile', y='tax_difference', data=work_df, showfliers=False)
-    weighted_boxplot(work_df, 'wprm')
+    sns.boxplot(x='quantile', y='difference', hue='quartile', data=df, showfliers=False)
+
+
+    plt.figure(figsize=(10, 6))
+    sns.boxplot(x='quantile', y='tax_difference', data=work_df, showfliers=False)
+
 
     plt.title('Boxplot per Decile')
     plt.xlabel('Decile')
