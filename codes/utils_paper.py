@@ -79,9 +79,8 @@ def beneficiary_reform(df, list_ETI, beginning_year, end_year):
     plt.figure()
     for col in df_results.columns:
         plt.scatter(df_results.index, df_results[col], label=f'Elasticity {col}')
-    plt.title('Evolution of Elasticity Values Across Deciles')
+    plt.title('Winners and Losers of french Tax Reforms')
     plt.xlabel('Decile')
-    plt.ylabel('Elasticity Value')
     plt.legend()
     plt.xticks(range(1, 11))  
     plt.show()
