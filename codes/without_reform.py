@@ -196,41 +196,68 @@ def simulate_without_reform(beginning_year = None, end_year = None):
                     simulation.set_input(ma_variable, end_reform, numpy.array(data_people[ma_variable])) 
                 else: #here we account for inflation
                     simulation.set_input(ma_variable, end_reform, numpy.array(data_people[ma_variable])*(1+inflation_coeff))
+                    # even when we have ETI values different from 0, we let this earning y1 = y0_hat (inflated)
+                    # because with the ETI y1 = [1 - ETI*(tau1 - tau0)/(1-tau0)]y0 relies on tau1 (serpent qui se mort la queue sinon)
+                    # TODO ask Pierre whether this is correct 
 
             else: # all variables at the household level
                 simulation.set_input(ma_variable, beginning_reform, numpy.array(data_households[ma_variable]))
                 simulation.set_input(ma_variable, end_reform, numpy.array(data_households[ma_variable]))
     
 
-    # the thing is that tax is computed at the foyer_fiscal level and we are working at the individual level
-    # so to individualize we divide tax by 2 for couples
                 
     total_taxes_before_reform = simulation.calculate('impot_revenu_restant_a_payer', beginning_reform)
-    print("taxes before reform (foyer fiscal level)", total_taxes_before_reform)
     total_taxes_after_reform = simulation.calculate('impot_revenu_restant_a_payer', end_reform)
-    print("taxes after reform (foyer fiscal level)", total_taxes_after_reform)
+    average_tax_rate_before_reform = simulation.calculate('taux_moyen_imposition', beginning_reform)
+    marginal_tax_rate_before_reform = simulation.calculate('ir_taux_marginal', beginning_reform)
+    average_tax_rate_after_reform = simulation.calculate('taux_moyen_imposition', end_reform)
+    marginal_tax_rate_after_reform = simulation.calculate('ir_taux_marginal', end_reform)
 
-    maries_ou_pacses = simulation.calculate('maries_ou_pacses', beginning_reform) # we take marital status before the reform, what if it changes during the reform ?
-    total_taxes_before_reform[maries_ou_pacses] /= 2 #equal split between couples also of the tax 
-    total_taxes_after_reform[maries_ou_pacses] /= 2
+    print("taxes before reform (foyer fiscal level)", total_taxes_before_reform)
+    print("taxes after reform (foyer fiscal level)", total_taxes_after_reform)
+    print("avg tax rates before reform (foyer fiscal level)", average_tax_rate_before_reform)
+    print("MTR before reform (foyer fiscal level)", marginal_tax_rate_before_reform)
+    print("avg tax rates after reform (foyer fiscal level)", average_tax_rate_after_reform)
+    print("MTR after reform (foyer fiscal level)", marginal_tax_rate_after_reform)
 
     tax_difference = -total_taxes_after_reform + total_taxes_before_reform #impot_revenu_restant_a_payer is negative in the model
 
+    # the thing is that tax is computed at the foyer_fiscal level and we are working at the individual level
+    # so to individualize we merge info to the individual level (same tax and tax rates for all individuals of a same foyer fiscal, coherent with equal split)
     # we store information at the foyer fiscal level
     data_foyerfiscaux = pandas.DataFrame()
     data_foyerfiscaux['idfoy'] = numpy.arange(len(total_taxes_after_reform))
     data_foyerfiscaux['tax_difference'] = tax_difference
+    data_foyerfiscaux['average_tax_rate_before_reform'] = average_tax_rate_before_reform
+    data_foyerfiscaux['marginal_tax_rate_before_reform'] = marginal_tax_rate_before_reform
+    data_foyerfiscaux['average_tax_rate_after_reform'] = average_tax_rate_after_reform
+    data_foyerfiscaux['marginal_tax_rate_after_reform'] = marginal_tax_rate_after_reform
 
     # we add this foyer fiscal information to the individual level : 
     # need to discard children otherwise children considered as paying the taxes of their foyer fiscal
+    # (but we discard children after the equal split so to have the same dataset as when the equal split of earnings was done)
     data_people = pandas.merge(data_people, data_foyerfiscaux, on='idfoy', how = 'left')
+
+    # here deal with married couples again : this line has to be USELESS because since we split the income equally between spouses they must have same tax liability and same tax rates
+    data_people = deal_with_married_couples(data_people, ['tax_difference', 'average_tax_rate_before_reform', 'marginal_tax_rate_before_reform', 'average_tax_rate_after_reform', 'marginal_tax_rate_after_reform'])
+
     data_people = data_people[data_people["age"] >= 18]
+
+
 
     # in our data we do not have capital revenue (rvcm in OpenFisca) 
     # so we just rank people according to their normal income 
     # (otherwise we would have removed capital earning since they are not a regular stream of income)
     data_people['total_earning'] = data_people[earnings_columns].sum(axis=1)
     data_people['earnings_rank'] = data_people['total_earning'].rank().astype(int)
+
+
+    list_ETI = [0., 0.25, 1., 1.25]
+    for ETI in list_ETI:
+        data_people[f"total_earning_after_reform_{ETI}"] = (1 - (data_people["marginal_tax_rate_after_reform"]-data_people["marginal_tax_rate_before_reform"])/(1 - data_people["marginal_tax_rate_before_reform"])*ETI)*data_people["total_earning"]
+        data_people[f'individual_revenue_effect_{ETI}'] = data_people["average_tax_rate_after_reform"]*data_people[f"total_earning_after_reform_{ETI}"] - data_people['average_tax_rate_before_reform']*data_people["total_earning"]
+
+
     print("data_people", data_people)
 
     data_people.to_csv(f'excel/{beginning_reform}-{end_reform}/people_adults_{beginning_reform}-{end_reform}.csv', index=False)
