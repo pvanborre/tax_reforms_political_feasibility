@@ -217,9 +217,12 @@ def pareto_bounds(df, beginning_year, end_year):
     list_ETI_upper = [0.25, 0.4, 0.5, 0.75, 1., 1.25]
     base_upper_bound = (1 - cdf)/(grid_earnings * pdf) 
     
+    
+    condition_threshold = (grid_earnings > np.percentile(total_earning, 15))
+    
     for ETI in list_ETI_upper:
         upper_bound = base_upper_bound * 1/ETI
-        plt.plot(grid_earnings, upper_bound, label=ETI)
+        plt.plot(grid_earnings[condition_threshold], upper_bound[condition_threshold], label=ETI)
 
     # T'/(1-T') part
     smoothed_y_primary_before = tax_ratio_by_earning(total_earning = total_earning,
@@ -234,8 +237,8 @@ def pareto_bounds(df, beginning_year, end_year):
                                               weights = weights)
 
 
-    plt.plot(grid_earnings, smoothed_y_primary_before, label='MTR ratio before', color = 'blue')   
-    plt.plot(grid_earnings, smoothed_y_primary_after, label='MTR ratio after', color = 'red')   
+    plt.plot(grid_earnings[condition_threshold], smoothed_y_primary_before[condition_threshold], label='MTR ratio before', color = 'blue')   
+    plt.plot(grid_earnings[condition_threshold], smoothed_y_primary_after[condition_threshold], label='MTR ratio after', color = 'red')   
 
     
     plt.title('Upper Pareto Bound')  
