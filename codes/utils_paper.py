@@ -149,26 +149,33 @@ def pareto_bounds(df, beginning_year, end_year):
 
     work_df = df.copy()
     work_df.sort_values(by="total_earning", inplace=True)
-    work_df = work_df[work_df["total_earning"] > np.percentile(work_df["total_earning"].values, 8)] # for this function we remove null earnings otherwise problem with grid and estimates
+    work_df = work_df[work_df["total_earning"] > 0] # for this function we remove null earnings otherwise problem with grid and estimates
     
     work_df["mtr_ratio_before"] = 100*work_df["marginal_tax_rate_before_reform"]/(1 - work_df["marginal_tax_rate_before_reform"])
     mtr_ratio = work_df["mtr_ratio_before"].values
     total_earning = work_df["total_earning"].values
     weights = work_df["wprm"].values
-    grid_earnings = np.linspace(np.percentile(total_earning, 1), np.percentile(total_earning, 95), 1000)
+    grid_earnings = np.linspace(np.percentile(total_earning, 1), np.percentile(total_earning, 99), 1000)
     
     # Pareto Bounds part
     kde = gaussian_kde(total_earning, weights=weights)    
     pdf = kde(grid_earnings)
     cdf = np.cumsum(pdf) / np.sum(pdf)
-    
+
+
     plt.figure()
+
+    # plt.plot(grid_earnings, 1 - cdf, label='1 - cdf')
+    # plt.plot(grid_earnings, pdf, label='pdf')
+    # plt.plot(grid_earnings, (1-cdf)/pdf, label='pdf')
+
+
     list_ETI = [0.25, 0.4, 0.5, 0.75, 1., 1.25]
     base_upper_bound = (1 - cdf)/(grid_earnings * pdf) 
     
     for ETI in list_ETI:
         upper_bound = base_upper_bound * 1/ETI
-        plt.plot(grid_earnings, upper_bound, label='upper bound')
+        plt.plot(grid_earnings, upper_bound, label=ETI)
 
     # T'/(1-T') part : for each earning average all values and then fit a gaussian kernel to interpolate 
     unique_earning = np.unique(total_earning)
@@ -188,6 +195,7 @@ def pareto_bounds(df, beginning_year, end_year):
 
     
     plt.title('Upper Pareto Bound')  
+    plt.legend()
     plt.show()
     plt.savefig('../outputs/upper_pareto_bound/upper_pareto_bound_{beginning_year}-{end_year}.png'.format(beginning_year = beginning_year, end_year = end_year))
     plt.close()
@@ -207,6 +215,9 @@ def main_function(beginning_year = None, end_year = None):
 
     # read csv
     people_df = pd.read_csv(f'excel/{beginning_year}-{end_year}/people_adults_{beginning_year}-{end_year}.csv')
+
+    # very few individuals have weight 0, we remove them (a bit weird)
+    people_df = people_df[people_df["wprm"] != 0]
 
     # we sort the dataframe by earnings so that the cumulative sum of the weights gives info about deciles
     work_df = people_df.sort_values(by='earnings_rank')
