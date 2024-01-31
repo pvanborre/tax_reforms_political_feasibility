@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.stats import gaussian_kde
-
+from statsmodels.nonparametric.kernel_regression import KernelReg
 import seaborn as sns
 
 import click
@@ -164,13 +164,55 @@ def pareto_bounds(df, beginning_year, end_year):
         upper_bound = base_upper_bound * 1/ETI
         plt.plot(grid_earnings, upper_bound, label='CDF')
 
-    work_df["tax_ratio_before"] = 100*work_df["marginal_tax_rate_before_reform"]/(1 - work_df["marginal_tax_rate_before_reform"])
-    plt.plot(work_df["total_earning"], work_df["tax_ratio_before"])
     
     plt.title('Upper Pareto Bound')  
     plt.show()
     plt.savefig('../outputs/upper_pareto_bound/upper_pareto_bound_{beginning_year}-{end_year}.png'.format(beginning_year = beginning_year, end_year = end_year))
     plt.close()
+
+
+def tax_ratio_by_earnings(df, beginning_year, end_year):
+    """
+    Function that will be merged with Pareto bounds once stable 
+    """
+    work_df = df.copy()
+    work_df.sort_values(by="total_earning", inplace=True)
+    work_df = work_df[work_df["total_earning"] > 0] # for this function we remove null earnings otherwise problem with grid and estimates
+    
+    work_df["tax_ratio_before"] = 100*work_df["marginal_tax_rate_before_reform"]/(1 - work_df["marginal_tax_rate_before_reform"])
+    
+    mtr_ratio = work_df["tax_ratio_before"].values
+    earning = work_df["total_earning"].values
+    weights = work_df["wprm"].values
+
+    print("mtr_ratio", mtr_ratio)
+    print("earning", earning)
+    print("weights", weights)
+
+    unique_earning = np.unique(earning)
+    mean_tax_rates = np.zeros_like(unique_earning, dtype=float)
+
+    for i, unique_value in enumerate(unique_earning):
+        indices = np.where(earning == unique_value)
+        mean_tax_rate = np.average(mtr_ratio[indices], weights=weights[indices])
+        mean_tax_rates[i] = mean_tax_rate
+
+    print("unique_earning", unique_earning)
+    print("mean_tax_rates", mean_tax_rates)
+
+    bandwidth = 5000
+    kernel_reg = KernelReg(endog=mean_tax_rates, exog=unique_earning, var_type='c', reg_type='ll', bw=[bandwidth], ckertype='gaussian')
+    grid_earnings = np.linspace(np.percentile(work_df['total_earning'].values, 1), np.percentile(work_df['total_earning'].values, 99), 1000)
+    smoothed_y_primary, _ = kernel_reg.fit(grid_earnings)
+    
+    plt.figure()
+    plt.scatter(unique_earning, mean_tax_rates, label='MTR ratio without smoothing', color = 'lightgreen')
+    plt.plot(grid_earnings, smoothed_y_primary, label='MTR ratio with smoothing', color = 'red')   
+    plt.title('Tax ratios')  
+    plt.show()
+    plt.savefig('../outputs/tax_ratio_{beginning_year}-{end_year}.png'.format(beginning_year = beginning_year, end_year = end_year))
+    plt.close()
+
 
 
 
@@ -206,6 +248,7 @@ def main_function(beginning_year = None, end_year = None):
 
     # plot pareto Bounds
     pareto_bounds(work_df, beginning_year, end_year)
+    tax_ratio_by_earnings(work_df, beginning_year, end_year)
 
         
 main_function()
