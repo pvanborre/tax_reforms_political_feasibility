@@ -14,7 +14,7 @@ def tax_liability_difference(work_df, beginning_year, end_year):
     """
     Computes the average per decile of T_1(y_hat) - T_0(y)
     We could have worked on tax_difference but to be consistent with the following functions we work with : 
-    t1*y0 - t0*y0
+    t1*y0 - t0*y0 = (t1 - t0)y0
     """
 
     work_df["difference_recomputed"] = (work_df["average_tax_rate_after_reform"] - work_df["average_tax_rate_before_reform"])*work_df["total_earning"]
@@ -122,10 +122,9 @@ def increased_progressivity(df, beginning_year, end_year):
     """
 
     # per decile, we compute the average of T'/(1-T')
-    df["tax_ratio_before"] = df["marginal_tax_rate_before_reform"]/(1 - df["marginal_tax_rate_before_reform"])
-    df["tax_ratio_after"] = df["marginal_tax_rate_after_reform"]/(1 - df["marginal_tax_rate_after_reform"])
-    result_before = df.groupby('quantile').apply(lambda x: np.average(x['tax_ratio_before'], weights=x['wprm']))
-    result_after = df.groupby('quantile').apply(lambda x: np.average(x['tax_ratio_after'], weights=x['wprm']))
+
+    result_before = df.groupby('quantile').apply(lambda x: np.average(x['mtr_ratio_before'], weights=x['wprm']))
+    result_after = df.groupby('quantile').apply(lambda x: np.average(x['mtr_ratio_after'], weights=x['wprm']))
 
 
     plt.figure()
@@ -188,14 +187,12 @@ def pareto_bounds(df, beginning_year, end_year):
     """
     Plots Pareto Bounds
     D_up = (1 - cdf)/y.pdf * 1/ETI
+    D_low =  - cdf/y.pdf * 1/ETI
     """
 
     work_df = df.copy()
     work_df.sort_values(by="total_earning", inplace=True)
     work_df = work_df[work_df["total_earning"] > 0] # for this function we remove null earnings otherwise problem with grid and estimates
-    
-    work_df["mtr_ratio_before"] = 100*work_df["marginal_tax_rate_before_reform"]/(1 - work_df["marginal_tax_rate_before_reform"])
-    work_df["mtr_ratio_after"] = 100*work_df["marginal_tax_rate_after_reform"]/(1 - work_df["marginal_tax_rate_after_reform"])
 
     total_earning = work_df["total_earning"].values # we base computations on the year before the reform
     weights = work_df["wprm"].values
@@ -289,6 +286,9 @@ def main_function(beginning_year = None, end_year = None):
     quantiles = [total_weight/10*i for i in range(1,11)]
     work_df['quantile'] = np.searchsorted(quantiles, work_df['cum_weight']) + 1
     work_df.loc[work_df['cum_weight'] > quantiles[-1], 'quantile'] = 10
+
+    work_df["mtr_ratio_before"] = work_df["marginal_tax_rate_before_reform"]/(1 - work_df["marginal_tax_rate_before_reform"])
+    work_df["mtr_ratio_after"] = work_df["marginal_tax_rate_after_reform"]/(1 - work_df["marginal_tax_rate_after_reform"])
     
     # First, plot average difference in tax liability per decile
     tax_liability_difference(work_df, beginning_year, end_year)
