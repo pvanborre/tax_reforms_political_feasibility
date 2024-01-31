@@ -106,11 +106,14 @@ def deal_with_married_couples(data_people, earnings_variables):
 
     married_df = data_people[data_people['statut_marital'] == 1]
     married_mean_df = married_df.groupby('idfoy')[earnings_variables].mean().reset_index()
-    married_augmented_df = pandas.merge(married_mean_df, married_df, on='idfoy', suffixes=('', '_oldvalues'))
 
+    # we created new columns that are means among foyer fiscaux : these new columns take the same name as the old one
+    # the old columns take the suffix oldvalues and we drop them at the end 
+    married_augmented_df = pandas.merge(married_mean_df, married_df, on='idfoy', suffixes=('', '_oldvalues'))
     columns_to_drop = married_augmented_df.filter(like='_oldvalues').columns
     married_augmented_df.drop(columns=columns_to_drop, inplace=True)
 
+    # we combine information from this dataset to the dataset of single people (that we do not modify)
     single_df = data_people[data_people['statut_marital'] != 1]
     final_df = pandas.concat([single_df, married_augmented_df]).sort_values(by='idfoy')
 
@@ -226,12 +229,14 @@ def simulate_without_reform(beginning_year = None, end_year = None):
     # so to individualize we merge info to the individual level (same tax and tax rates for all individuals of a same foyer fiscal, coherent with equal split)
     # we store information at the foyer fiscal level
     data_foyerfiscaux = pandas.DataFrame()
-    data_foyerfiscaux['idfoy'] = numpy.arange(len(total_taxes_after_reform))
+    data_foyerfiscaux['idfoy'] = numpy.arange(len(tax_difference))
     data_foyerfiscaux['tax_difference'] = tax_difference
     data_foyerfiscaux['average_tax_rate_before_reform'] = average_tax_rate_before_reform
     data_foyerfiscaux['marginal_tax_rate_before_reform'] = marginal_tax_rate_before_reform
     data_foyerfiscaux['average_tax_rate_after_reform'] = average_tax_rate_after_reform
     data_foyerfiscaux['marginal_tax_rate_after_reform'] = marginal_tax_rate_after_reform
+
+    # TODO question : also compute from the simulation rni (revenu net imposable) since average_tax_rate = tax_liability/rni ?
 
     # we add this foyer fiscal information to the individual level : 
     # need to discard children otherwise children considered as paying the taxes of their foyer fiscal
@@ -244,15 +249,18 @@ def simulate_without_reform(beginning_year = None, end_year = None):
     data_people = data_people[data_people["age"] >= 18]
 
 
-
     # in our data we do not have capital revenue (rvcm in OpenFisca) 
     # so we just rank people according to their normal income 
     # (otherwise we would have removed capital earning since they are not a regular stream of income)
     data_people['total_earning'] = data_people[earnings_columns].sum(axis=1)
+    data_people['total_earning_inflated'] = data_people['total_earning']*(1+inflation_coeff)
     data_people['earnings_rank'] = data_people['total_earning'].rank().astype(int)
 
 
     list_ETI = [0., 0.25, 1., 1.25]
+    # formulas of the paper appendix C 
+    # y1 = [1 - (tau_1 - tau_0)/(1 - tau_0) ETI]y0
+    # R = t1 y1 - t0 y0
     for ETI in list_ETI:
         data_people[f"total_earning_after_reform_{ETI}"] = (1 - (data_people["marginal_tax_rate_after_reform"]-data_people["marginal_tax_rate_before_reform"])/(1 - data_people["marginal_tax_rate_before_reform"])*ETI)*data_people["total_earning"]
         data_people[f'individual_revenue_effect_{ETI}'] = data_people["average_tax_rate_after_reform"]*data_people[f"total_earning_after_reform_{ETI}"] - data_people['average_tax_rate_before_reform']*data_people["total_earning"]
