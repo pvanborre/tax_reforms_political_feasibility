@@ -233,6 +233,8 @@ def simulate_without_reform(beginning_year = None, end_year = None):
     data_foyerfiscaux['average_tax_rate_after_reform'] = average_tax_rate_after_reform
     data_foyerfiscaux['marginal_tax_rate_after_reform'] = marginal_tax_rate_after_reform
 
+    # question : also compute from the simulation rni (revenu net imposable) since average_tax_rate = tax_liability/rni ?
+
     # we add this foyer fiscal information to the individual level : 
     # need to discard children otherwise children considered as paying the taxes of their foyer fiscal
     # (but we discard children after the equal split so to have the same dataset as when the equal split of earnings was done)
@@ -242,6 +244,7 @@ def simulate_without_reform(beginning_year = None, end_year = None):
     data_people = deal_with_married_couples(data_people, ['tax_difference', 'average_tax_rate_before_reform', 'marginal_tax_rate_before_reform', 'average_tax_rate_after_reform', 'marginal_tax_rate_after_reform'])
 
     data_people = data_people[data_people["age"] >= 18]
+
 
 
 
