@@ -15,28 +15,28 @@ def tax_liability_difference(work_df, beginning_year, end_year):
     Computes the average per decile of T_1(y_hat) - T_0(y)
     We could have worked on tax_difference but to be consistent with the following functions we work with : 
     t1*y0 - t0*y0 = (t1 - t0)y0
+
+    Then plots a boxplot of this difference to see heterogeneity within deciles
     """
 
     work_df["difference_recomputed"] = (work_df["average_tax_rate_after_reform"] - work_df["average_tax_rate_before_reform"])*work_df["total_earning"]
 
     # per decile, we compute the average of tax difference, that is of T_1(y_hat) - T_0(y) 
-    result = work_df.groupby('quantile').apply(lambda x: np.average(x['difference_recomputed'], weights=x['wprm']))
+    result = work_df.groupby('decile').apply(lambda x: np.average(x['difference_recomputed'], weights=x['wprm']))
 
     # We fit a quadratic polynomial to the original data
-    x_values = 10*work_df["cum_weight"]/work_df['wprm'].sum() #*10 to be in [0,10]
+    x_values = 10*work_df["cum_weight"]/(work_df['wprm'].sum()) #*10 to be in [0,10]
     y_values = work_df["difference_recomputed"]
-    coefficients = np.polyfit(x_values, y_values, 2)
+    coefficients = np.polyfit(x_values, y_values, 2) # quadratic
     poly = np.poly1d(coefficients)
     x_interpolated = np.linspace(0, 10, 1000)   # 0 here, not 1
     y_interpolated = poly(x_interpolated)
 
 
     plt.figure()
-    plt.scatter(result.index, result.values)
+    plt.scatter(result.index, result.values, label = "Average per decile of the difference in tax liability", color = "blue")
     plt.plot(x_interpolated, y_interpolated, label='Quadratic Polynomial Fit', color='red')
-    plt.xlabel('Quantile')
-    plt.ylabel('Weighted Mean of Difference')
-    plt.title('Weighted Mean of Difference for Each Quantile')
+    plt.title('Changes in Tax Liability: Average Values per Decile')
     plt.xticks(range(1, 11))  
     plt.legend()
     plt.show()
@@ -46,12 +46,8 @@ def tax_liability_difference(work_df, beginning_year, end_year):
 
 
     plt.figure(figsize=(10, 6))
-    sns.boxplot(x='quantile', y='difference_recomputed', data=work_df, showfliers=False)
-
-
-    plt.title('Boxplot per Decile')
-    plt.xlabel('Decile')
-    plt.ylabel('Tax Difference')
+    sns.boxplot(x='decile', y='difference_recomputed', data=work_df, showfliers=False)
+    plt.title('Changes in Tax Liability: Heterogeneity within Deciles')
     plt.xticks(range(1, 11))  
     plt.show()
     plt.savefig('../outputs/tax_liability_difference_boxplot/tax_liability_difference_boxplot_{beginning_year}-{end_year}.png'.format(beginning_year = beginning_year, end_year = end_year))
@@ -61,10 +57,14 @@ def tax_liability_difference(work_df, beginning_year, end_year):
 
 def beneficiary_reform(df, list_ETI, beginning_year, end_year):
     """
-    Computes the average per decile of max{T1(y1) - T0(y1), T1(y0_hat) - T0(y0)} - R(tau,h)
+    Computes the average per decile of max{T1(y1) - T0(y1), T1(y0_hat) - T0(y0)} - R(tau,h) for 4 different ETI values
     According to appendix C we approximate T1 and T0 by average tax rates such that 
     T1(y1) - T0(y1) = t1*y1 - t0*y1
     T1(y0_hat) - T0(y0) = t1*y0 - t0*y0 (We use such an approx even though we know tax_difference = T1(y0_hat) - T0(y0) to be consistent with the other term)
+    
+    Then we know for everybody whether he is a winner or a loser of a reform so we can compute the percentage of winners of the population
+    We then check whether median support is aligned with support in the whole population (to see whether reforms are enough monotonic)
+    To do so we draw a point that is (percentage winners P45-P55, percentage winners whole population) for 4 different ETI values
     """
     df_results = pd.DataFrame()
 
@@ -79,13 +79,12 @@ def beneficiary_reform(df, list_ETI, beginning_year, end_year):
 
         df[f"winner_{ETI}"] = (df["reform_effect"] <= 0)
 
-        df_results[ETI] = df.groupby('quantile').apply(lambda x: np.average(x['reform_effect'], weights=x['wprm']))
+        df_results[ETI] = df.groupby('decile').apply(lambda x: np.average(x['reform_effect'], weights=x['wprm']))
 
     plt.figure()
     for col in df_results.columns:
         plt.scatter(df_results.index, df_results[col], label=f'Elasticity {col}')
-    plt.title('Winners and Losers of french Tax Reforms')
-    plt.xlabel('Decile')
+    plt.title('Winners and Losers of Major French Tax Reforms')
     plt.legend()
     plt.xticks(range(1, 11))  
     plt.show()
@@ -97,9 +96,9 @@ def beneficiary_reform(df, list_ETI, beginning_year, end_year):
     median_df = df[(df["cum_weight"] >= 0.45*total_weight) & (df["cum_weight"] <= 0.55*total_weight)]
 
     for ETI in list_ETI:
-        number_winner = np.average(df[f"winner_{ETI}"], weights=df['wprm'])
-        number_winner_median = np.average(median_df[f"winner_{ETI}"], weights=median_df['wprm'])
-        plt.scatter(100*number_winner_median, 100*number_winner, label=ETI)
+        percentage_winners = 100*np.average(df[f"winner_{ETI}"], weights=df['wprm'])
+        percentage_winners_median = 100*np.average(median_df[f"winner_{ETI}"], weights=median_df['wprm'])
+        plt.scatter(percentage_winners_median, percentage_winners, label=ETI)
 
     x = np.linspace(0,100,100)
     plt.plot(x, x, linestyle='--') 
@@ -122,17 +121,14 @@ def increased_progressivity(df, beginning_year, end_year):
     """
 
     # per decile, we compute the average of T'/(1-T')
-
-    result_before = df.groupby('quantile').apply(lambda x: np.average(x['mtr_ratio_before'], weights=x['wprm']))
-    result_after = df.groupby('quantile').apply(lambda x: np.average(x['mtr_ratio_after'], weights=x['wprm']))
+    result_before = df.groupby('decile').apply(lambda x: np.average(x['mtr_ratio_before'], weights=x['wprm']))
+    result_after = df.groupby('decile').apply(lambda x: np.average(x['mtr_ratio_after'], weights=x['wprm']))
 
 
     plt.figure()
     plt.scatter(result_before.index, result_before.values, c = "blue", label = beginning_year)
     plt.scatter(result_after.index, result_after.values, c = "red", label = end_year)
-
-    plt.xlabel('Quantile')
-    plt.ylabel('Average Tax Ratio')
+    plt.title("T'/(1-T') by Decile before and after Each Reform")
     plt.xticks(range(1, 11))  
     plt.legend()
     plt.show()
@@ -143,17 +139,20 @@ def increased_progressivity(df, beginning_year, end_year):
 
 def tax_ratio_by_earning(total_earning, grid_earnings, mtr_ratio, weights):
     """
-    T'/(1-T') part : for each earning average all values and then fit a gaussian kernel to interpolate 
+    T'/(1-T') part : for each earning average all values of this ratio
+    and then fit a gaussian kernel to interpolate over a given grid of earnings
     """
     
     unique_earning = np.unique(total_earning)
     mean_tax_ratios = np.zeros_like(unique_earning, dtype=float)
 
+    # for each unique earning we average over all values of this ratio
     for i, unique_value in enumerate(unique_earning):
         indices = np.where(total_earning == unique_value)
         mean_tax_rate = np.average(mtr_ratio[indices], weights=weights[indices])
         mean_tax_ratios[i] = mean_tax_rate
 
+    # fit a gaussian kernel
     bandwidth = 5000
     kernel_reg = KernelReg(endog=mean_tax_ratios, exog=unique_earning, var_type='c', reg_type='ll', bw=[bandwidth], ckertype='gaussian')
     smoothed_y_primary, _ = kernel_reg.fit(grid_earnings)
@@ -162,7 +161,10 @@ def tax_ratio_by_earning(total_earning, grid_earnings, mtr_ratio, weights):
 
 def robustness_check_pareto_bound(grid_earnings, cdf, pdf, beginning_year, end_year):
     """
-    Plots components of the bound separately
+    Plots components of the Pareto bound separately, that is plots :
+    - the tail distribution/survival function 1 - cdf
+    - the density pdf 
+    - the ratio of the two that is almost the upper Pareto bound (still need to account for ETI)
     """
     fig, axs = plt.subplots(3, 1, figsize=(8, 12))
 
@@ -188,6 +190,11 @@ def pareto_bounds(df, beginning_year, end_year):
     Plots Pareto Bounds
     D_up = (1 - cdf)/y.pdf * 1/ETI
     D_low =  - cdf/y.pdf * 1/ETI
+
+    On the same graph also plot T'/(1-T') before and after the reform 
+
+    To do so we define a grid of earnings on which we fit a gaussian to get the density pdf, from which we deduce the cdf
+    For the T'/(1-T') part : at a given earning we average this ratio among all individuals that earn this earning, and then interpolate data with a gaussian kernel.
     """
 
     work_df = df.copy()
@@ -204,15 +211,13 @@ def pareto_bounds(df, beginning_year, end_year):
     pdf = kde(grid_earnings)
     cdf = np.cumsum(pdf) / np.sum(pdf)
 
-    
     robustness_check_pareto_bound(grid_earnings, cdf, pdf, beginning_year, end_year)
 
-
     plt.figure()
-    list_ETI = [0.25, 0.4, 0.5, 0.75, 1., 1.25]
+    list_ETI_upper = [0.25, 0.4, 0.5, 0.75, 1., 1.25]
     base_upper_bound = (1 - cdf)/(grid_earnings * pdf) 
     
-    for ETI in list_ETI:
+    for ETI in list_ETI_upper:
         upper_bound = base_upper_bound * 1/ETI
         plt.plot(grid_earnings, upper_bound, label=ETI)
 
@@ -223,7 +228,7 @@ def pareto_bounds(df, beginning_year, end_year):
                                               weights = weights)
 
 
-    smoothed_y_primary_after = tax_ratio_by_earning(total_earning = work_df["total_earning_after_reform_0.0"].values, # only inflated version (from which we computed mtr after)
+    smoothed_y_primary_after = tax_ratio_by_earning(total_earning = work_df["total_earning_inflated"].values, # only inflated version (from which we computed the mtr after the reform)
                                               grid_earnings = grid_earnings, 
                                               mtr_ratio = work_df["mtr_ratio_after"].values, 
                                               weights = weights)
@@ -241,10 +246,10 @@ def pareto_bounds(df, beginning_year, end_year):
 
 
     plt.figure()
-    list_ETI = [5, 4, 3, 2]
+    list_ETI_lower = [5, 4, 3, 2]
     base_lower_bound = - cdf/(grid_earnings * pdf) 
     
-    for ETI in list_ETI:
+    for ETI in list_ETI_lower:
         lower_bound = base_lower_bound * 1/ETI
         plt.plot(grid_earnings, lower_bound, label=ETI)
 
@@ -275,17 +280,18 @@ def main_function(beginning_year = None, end_year = None):
     people_df = pd.read_csv(f'excel/{beginning_year}-{end_year}/people_adults_{beginning_year}-{end_year}.csv')
 
     # very few individuals have weight 0, we remove them (a bit weird)
+    print("number outliers removed", len(people_df[people_df["wprm"] == 0]))
     people_df = people_df[people_df["wprm"] != 0]
 
     # we sort the dataframe by earnings so that the cumulative sum of the weights gives info about deciles
     work_df = people_df.sort_values(by='earnings_rank')
     work_df['cum_weight'] = work_df['wprm'].cumsum()
 
-    # we compute the total_weight that helps us define the quantiles
+    # we compute the total_weight that helps us define the deciles
     total_weight = work_df['wprm'].sum()
-    quantiles = [total_weight/10*i for i in range(1,11)]
-    work_df['quantile'] = np.searchsorted(quantiles, work_df['cum_weight']) + 1
-    work_df.loc[work_df['cum_weight'] > quantiles[-1], 'quantile'] = 10
+    deciles = [total_weight/10*i for i in range(1,11)]
+    work_df['decile'] = np.searchsorted(deciles, work_df['cum_weight']) + 1
+    work_df.loc[work_df['cum_weight'] > deciles[-1], 'decile'] = 10
 
     work_df["mtr_ratio_before"] = work_df["marginal_tax_rate_before_reform"]/(1 - work_df["marginal_tax_rate_before_reform"])
     work_df["mtr_ratio_after"] = work_df["marginal_tax_rate_after_reform"]/(1 - work_df["marginal_tax_rate_after_reform"])
