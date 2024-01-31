@@ -179,34 +179,27 @@ def tax_ratio_by_earnings(df, beginning_year, end_year):
     work_df.sort_values(by="total_earning", inplace=True)
     work_df = work_df[work_df["total_earning"] > 0] # for this function we remove null earnings otherwise problem with grid and estimates
     
-    work_df["tax_ratio_before"] = 100*work_df["marginal_tax_rate_before_reform"]/(1 - work_df["marginal_tax_rate_before_reform"])
+    work_df["mtr_ratio_before"] = 100*work_df["marginal_tax_rate_before_reform"]/(1 - work_df["marginal_tax_rate_before_reform"])
     
-    mtr_ratio = work_df["tax_ratio_before"].values
+    mtr_ratio = work_df["mtr_ratio_before"].values
     earning = work_df["total_earning"].values
     weights = work_df["wprm"].values
 
-    print("mtr_ratio", mtr_ratio)
-    print("earning", earning)
-    print("weights", weights)
-
     unique_earning = np.unique(earning)
-    mean_tax_rates = np.zeros_like(unique_earning, dtype=float)
+    mean_tax_ratios = np.zeros_like(unique_earning, dtype=float)
 
     for i, unique_value in enumerate(unique_earning):
         indices = np.where(earning == unique_value)
         mean_tax_rate = np.average(mtr_ratio[indices], weights=weights[indices])
-        mean_tax_rates[i] = mean_tax_rate
-
-    print("unique_earning", unique_earning)
-    print("mean_tax_rates", mean_tax_rates)
+        mean_tax_ratios[i] = mean_tax_rate
 
     bandwidth = 5000
-    kernel_reg = KernelReg(endog=mean_tax_rates, exog=unique_earning, var_type='c', reg_type='ll', bw=[bandwidth], ckertype='gaussian')
-    grid_earnings = np.linspace(np.percentile(work_df['total_earning'].values, 1), np.percentile(work_df['total_earning'].values, 99), 1000)
+    kernel_reg = KernelReg(endog=mean_tax_ratios, exog=unique_earning, var_type='c', reg_type='ll', bw=[bandwidth], ckertype='gaussian')
+    grid_earnings = np.linspace(np.percentile(earning, 1), np.percentile(earning, 99), 1000)
     smoothed_y_primary, _ = kernel_reg.fit(grid_earnings)
-    
+
     plt.figure()
-    plt.scatter(unique_earning, mean_tax_rates, label='MTR ratio without smoothing', color = 'lightgreen')
+    plt.scatter(unique_earning, mean_tax_ratios, label='MTR ratio without smoothing', color = 'lightgreen')
     plt.plot(grid_earnings, smoothed_y_primary, label='MTR ratio with smoothing', color = 'red')   
     plt.title('Tax ratios')  
     plt.show()
