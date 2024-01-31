@@ -141,43 +141,12 @@ def increased_progressivity(df, beginning_year, end_year):
     plt.close()
 
 
-def pareto_bounds(df, beginning_year, end_year):
+
+def tax_ratio_by_earning(total_earning, grid_earnings, mtr_ratio, weights):
     """
-    Plots Pareto Bounds
-    D_up = (1 - cdf)/y.pdf * 1/ETI
+    T'/(1-T') part : for each earning average all values and then fit a gaussian kernel to interpolate 
     """
-
-    work_df = df.copy()
-    work_df.sort_values(by="total_earning", inplace=True)
-    work_df = work_df[work_df["total_earning"] > 0] # for this function we remove null earnings otherwise problem with grid and estimates
     
-    work_df["mtr_ratio_before"] = 100*work_df["marginal_tax_rate_before_reform"]/(1 - work_df["marginal_tax_rate_before_reform"])
-    mtr_ratio = work_df["mtr_ratio_before"].values
-    total_earning = work_df["total_earning"].values
-    weights = work_df["wprm"].values
-    grid_earnings = np.linspace(np.percentile(total_earning, 1), np.percentile(total_earning, 99), 1000)
-    
-    # Pareto Bounds part
-    kde = gaussian_kde(total_earning, weights=weights)    
-    pdf = kde(grid_earnings)
-    cdf = np.cumsum(pdf) / np.sum(pdf)
-
-
-    plt.figure()
-
-    # plt.plot(grid_earnings, 1 - cdf, label='1 - cdf')
-    # plt.plot(grid_earnings, pdf, label='pdf')
-    # plt.plot(grid_earnings, (1-cdf)/pdf, label='pdf')
-
-
-    list_ETI = [0.25, 0.4, 0.5, 0.75, 1., 1.25]
-    base_upper_bound = (1 - cdf)/(grid_earnings * pdf) 
-    
-    for ETI in list_ETI:
-        upper_bound = base_upper_bound * 1/ETI
-        plt.plot(grid_earnings, upper_bound, label=ETI)
-
-    # T'/(1-T') part : for each earning average all values and then fit a gaussian kernel to interpolate 
     unique_earning = np.unique(total_earning)
     mean_tax_ratios = np.zeros_like(unique_earning, dtype=float)
 
@@ -189,15 +158,107 @@ def pareto_bounds(df, beginning_year, end_year):
     bandwidth = 5000
     kernel_reg = KernelReg(endog=mean_tax_ratios, exog=unique_earning, var_type='c', reg_type='ll', bw=[bandwidth], ckertype='gaussian')
     smoothed_y_primary, _ = kernel_reg.fit(grid_earnings)
+    return smoothed_y_primary
 
-    #plt.scatter(unique_earning, mean_tax_ratios, label='MTR ratio without smoothing', color = 'lightgreen')
-    plt.plot(grid_earnings, smoothed_y_primary, label='MTR ratio', color = 'red')   
+
+def robustness_check_pareto_bound(grid_earnings, cdf, pdf, beginning_year, end_year):
+    """
+    Plots components of the bound separately
+    """
+    fig, axs = plt.subplots(3, 1, figsize=(8, 12))
+
+    axs[0].plot(grid_earnings, 1 - cdf, label='1 - cdf')
+    axs[0].set_title('1 - cdf')
+
+    axs[1].plot(grid_earnings, pdf, label='pdf')
+    axs[1].set_title('pdf')
+
+    axs[2].plot(grid_earnings, (1 - cdf) / pdf, label='(1 - cdf) / pdf')
+    axs[2].set_title('(1 - cdf) / pdf')
+
+    for ax in axs:
+        ax.legend()
+
+    plt.tight_layout()
+    plt.show()
+    plt.savefig('../outputs/pareto_bound_robustness/pareto_bound_robustness_{beginning_year}-{end_year}.png'.format(beginning_year = beginning_year, end_year = end_year))
+    plt.close()
+
+def pareto_bounds(df, beginning_year, end_year):
+    """
+    Plots Pareto Bounds
+    D_up = (1 - cdf)/y.pdf * 1/ETI
+    """
+
+    work_df = df.copy()
+    work_df.sort_values(by="total_earning", inplace=True)
+    work_df = work_df[work_df["total_earning"] > 0] # for this function we remove null earnings otherwise problem with grid and estimates
+    
+    work_df["mtr_ratio_before"] = 100*work_df["marginal_tax_rate_before_reform"]/(1 - work_df["marginal_tax_rate_before_reform"])
+    work_df["mtr_ratio_after"] = 100*work_df["marginal_tax_rate_after_reform"]/(1 - work_df["marginal_tax_rate_after_reform"])
+
+    total_earning = work_df["total_earning"].values # we base computations on the year before the reform
+    weights = work_df["wprm"].values
+
+    grid_earnings = np.linspace(np.percentile(total_earning, 1), np.percentile(total_earning, 99), 1000)
+    
+    # Pareto Bounds part
+    kde = gaussian_kde(total_earning, weights=weights)    
+    pdf = kde(grid_earnings)
+    cdf = np.cumsum(pdf) / np.sum(pdf)
+
+    
+    robustness_check_pareto_bound(grid_earnings, cdf, pdf, beginning_year, end_year)
+
+
+    plt.figure()
+    list_ETI = [0.25, 0.4, 0.5, 0.75, 1., 1.25]
+    base_upper_bound = (1 - cdf)/(grid_earnings * pdf) 
+    
+    for ETI in list_ETI:
+        upper_bound = base_upper_bound * 1/ETI
+        plt.plot(grid_earnings, upper_bound, label=ETI)
+
+    # T'/(1-T') part
+    smoothed_y_primary_before = tax_ratio_by_earning(total_earning = total_earning,
+                                              grid_earnings = grid_earnings, 
+                                              mtr_ratio = work_df["mtr_ratio_before"].values, 
+                                              weights = weights)
+
+
+    smoothed_y_primary_after = tax_ratio_by_earning(total_earning = work_df["total_earning_after_reform_0.0"].values, # only inflated version (from which we computed mtr after)
+                                              grid_earnings = grid_earnings, 
+                                              mtr_ratio = work_df["mtr_ratio_after"].values, 
+                                              weights = weights)
+
+
+    plt.plot(grid_earnings, smoothed_y_primary_before, label='MTR ratio before', color = 'blue')   
+    plt.plot(grid_earnings, smoothed_y_primary_after, label='MTR ratio after', color = 'red')   
 
     
     plt.title('Upper Pareto Bound')  
     plt.legend()
     plt.show()
     plt.savefig('../outputs/upper_pareto_bound/upper_pareto_bound_{beginning_year}-{end_year}.png'.format(beginning_year = beginning_year, end_year = end_year))
+    plt.close()
+
+
+    plt.figure()
+    list_ETI = [5, 4, 3, 2]
+    base_lower_bound = - cdf/(grid_earnings * pdf) 
+    
+    for ETI in list_ETI:
+        lower_bound = base_lower_bound * 1/ETI
+        plt.plot(grid_earnings, lower_bound, label=ETI)
+
+    plt.plot(grid_earnings, smoothed_y_primary_before, label='MTR ratio before', color = 'blue')   
+    plt.plot(grid_earnings, smoothed_y_primary_after, label='MTR ratio after', color = 'red')   
+
+    
+    plt.title('Lower Pareto Bound')  
+    plt.legend()
+    plt.show()
+    plt.savefig('../outputs/lower_pareto_bound/lower_pareto_bound_{beginning_year}-{end_year}.png'.format(beginning_year = beginning_year, end_year = end_year))
     plt.close()
 
 
