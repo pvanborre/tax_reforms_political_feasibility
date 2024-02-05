@@ -147,6 +147,7 @@ def simulate_without_reform(beginning_year = None, end_year = None):
             "ric", "rnc", "rpns_imposables", "salaire_de_base", "primes_fonction_publique", "traitement_indiciaire_brut"]
 
     # perform equal split of earnings within couples 
+    # useless for the tax computation (at the foyer fiscal level) but useful to compute total_earning...
     data_people = deal_with_married_couples(data_people, earnings_columns)
 
     print("People data")
@@ -223,6 +224,11 @@ def simulate_without_reform(beginning_year = None, end_year = None):
     print("avg tax rates after reform (foyer fiscal level)", average_tax_rate_after_reform)
     print("MTR after reform (foyer fiscal level)", marginal_tax_rate_after_reform)
 
+    # to deal with married couples we perform equal split of taxes, however we cannot split the rates 
+    maries_ou_pacses = simulation.calculate('maries_ou_pacses', beginning_reform) # we take marital status before the reform, what if it changes during the reform ?
+    total_taxes_before_reform[maries_ou_pacses] /= 2 #equal split between couples also of the tax 
+    total_taxes_after_reform[maries_ou_pacses] /= 2
+
     tax_difference = -total_taxes_after_reform + total_taxes_before_reform #impot_revenu_restant_a_payer is negative in the model
 
     # the thing is that tax is computed at the foyer_fiscal level and we are working at the individual level
@@ -240,12 +246,7 @@ def simulate_without_reform(beginning_year = None, end_year = None):
 
     # we add this foyer fiscal information to the individual level : 
     # need to discard children otherwise children considered as paying the taxes of their foyer fiscal
-    # (but we discard children after the equal split so to have the same dataset as when the equal split of earnings was done)
     data_people = pandas.merge(data_people, data_foyerfiscaux, on='idfoy', how = 'left')
-
-    # here deal with married couples again : this line has to be USELESS because since we split the income equally between spouses they must have same tax liability and same tax rates
-    data_people = deal_with_married_couples(data_people, ['tax_difference', 'average_tax_rate_before_reform', 'marginal_tax_rate_before_reform', 'average_tax_rate_after_reform', 'marginal_tax_rate_after_reform'])
-
     data_people = data_people[data_people["age"] >= 18]
 
 

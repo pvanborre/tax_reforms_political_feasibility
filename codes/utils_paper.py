@@ -164,7 +164,7 @@ def robustness_check_pareto_bound(grid_earnings, cdf, pdf, beginning_year, end_y
     Plots components of the Pareto bound separately, that is plots :
     - the tail distribution/survival function 1 - cdf
     - the density pdf 
-    - the ratio of the two that is almost the upper Pareto bound (still need to account for ETI)
+    - the ratio of the two that is almost the upper Pareto bound (still need to account for y and the ETI)
     """
     fig, axs = plt.subplots(3, 1, figsize=(8, 12))
 
