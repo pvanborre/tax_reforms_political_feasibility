@@ -214,15 +214,20 @@ def pareto_bounds(df, beginning_year, end_year):
     robustness_check_pareto_bound(grid_earnings, cdf, pdf, beginning_year, end_year)
 
     plt.figure()
-    list_ETI_upper = [0.25, 0.4, 0.5, 0.75, 1., 1.25]
+    list_ETI_upper = [0.25, 0.5, 1., 1.25]  
     base_upper_bound = (1 - cdf)/(grid_earnings * pdf) 
     
     
-    condition_threshold = (grid_earnings > np.percentile(total_earning, 15))
+    condition_threshold = (grid_earnings > np.percentile(total_earning, 15)) & (grid_earnings < np.percentile(total_earning, 99))
     
     for ETI in list_ETI_upper:
         upper_bound = base_upper_bound * 1/ETI
         plt.plot(grid_earnings[condition_threshold], upper_bound[condition_threshold], label=ETI)
+
+    tab_percentile = [25, 50, 75, 90, 95, 99]
+    for percentile in tab_percentile:
+        plt.vlines(x=np.percentile(total_earning, percentile), ymin=0, ymax=12, colors='grey', ls='--', lw=0.5)
+        plt.text(np.percentile(total_earning, percentile), 12, f'P{percentile}', horizontalalignment='center')
 
     # T'/(1-T') part
     smoothed_y_primary_before = tax_ratio_by_earning(total_earning = total_earning,
@@ -251,13 +256,20 @@ def pareto_bounds(df, beginning_year, end_year):
     plt.figure()
     list_ETI_lower = [5, 4, 3, 2]
     base_lower_bound = - cdf/(grid_earnings * pdf) 
+
+    condition_threshold_low =  (grid_earnings < np.percentile(total_earning, 90))
     
     for ETI in list_ETI_lower:
         lower_bound = base_lower_bound * 1/ETI
-        plt.plot(grid_earnings, lower_bound, label=ETI)
+        plt.plot(grid_earnings[condition_threshold_low], lower_bound[condition_threshold_low], label=ETI)
 
-    plt.plot(grid_earnings, smoothed_y_primary_before, label='MTR ratio before', color = 'blue')   
-    plt.plot(grid_earnings, smoothed_y_primary_after, label='MTR ratio after', color = 'red')   
+    tab_percentile_low = [10, 25, 50]
+    for percentile in tab_percentile_low:
+        plt.vlines(x=np.percentile(total_earning, percentile), ymin=-5, ymax=2, colors='grey', ls='--', lw=0.5)
+        plt.text(np.percentile(total_earning, percentile), 2, f'P{percentile}', horizontalalignment='center')
+
+    plt.plot(grid_earnings[condition_threshold_low], smoothed_y_primary_before[condition_threshold_low], label='MTR ratio before', color = 'blue')   
+    plt.plot(grid_earnings[condition_threshold_low], smoothed_y_primary_after[condition_threshold_low], label='MTR ratio after', color = 'red')   
 
     
     plt.title('Lower Pareto Bound')  
