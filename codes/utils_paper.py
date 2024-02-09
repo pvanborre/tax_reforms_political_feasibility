@@ -199,12 +199,26 @@ def pareto_bounds(df, beginning_year, end_year):
 
     work_df = df.copy()
     work_df.sort_values(by="total_earning", inplace=True)
-    work_df = work_df[work_df["total_earning"] > 0] # for this function we remove null earnings otherwise problem with grid and estimates
+    #work_df = work_df[work_df["total_earning"] > 0] # for this function we remove null earnings otherwise problem with grid and estimates
 
     total_earning = work_df["total_earning"].values # we base computations on the year before the reform
     weights = work_df["wprm"].values
 
-    grid_earnings = np.linspace(np.percentile(total_earning, 1), np.percentile(total_earning, 99), 1000)
+    # we add centiles to the dataframe 
+    total_weight = np.sum(weights)
+    work_df['cum_weight2'] = work_df['wprm'].cumsum()
+    centiles = [total_weight/100*i for i in range(1,101)]
+    work_df['centile'] = np.searchsorted(centiles, work_df['cum_weight2']) + 1
+    work_df.loc[work_df['cum_weight2'] > centiles[-1], 'centile'] = 100
+    centiles = work_df["centile"].values
+
+    # we compute weighted centiles and store them in a dictionary values_centiles
+    values_centiles = {}
+    tab_values = [1, 5, 8, 10, 15, 20, 25, 35, 50, 75, 90, 95, 99]
+    for value in tab_values:
+        values_centiles[value] = np.mean(total_earning[centiles == value])
+
+    grid_earnings = np.linspace(values_centiles[1], values_centiles[99], 1000)
     
     # Pareto Bounds part
     kde = gaussian_kde(total_earning, weights=weights)    
@@ -218,16 +232,17 @@ def pareto_bounds(df, beginning_year, end_year):
     base_upper_bound = (1 - cdf)/(grid_earnings * pdf) 
     
     
-    condition_threshold = (grid_earnings > np.percentile(total_earning, 15)) & (grid_earnings < np.percentile(total_earning, 99))
+    condition_threshold = (grid_earnings > values_centiles[20]) & (grid_earnings < values_centiles[99])
     
     for ETI in list_ETI_upper:
         upper_bound = base_upper_bound * 1/ETI
         plt.plot(grid_earnings[condition_threshold], upper_bound[condition_threshold], label=ETI)
 
+    # we add vertical lines to the graph to indicate percentiles
     tab_percentile = [25, 50, 75, 90, 95, 99]
     for percentile in tab_percentile:
-        plt.vlines(x=np.percentile(total_earning, percentile), ymin=0, ymax=12, colors='grey', ls='--', lw=0.5)
-        plt.text(np.percentile(total_earning, percentile), 12, f'P{percentile}', horizontalalignment='center')
+        plt.vlines(x=values_centiles[percentile], ymin=0, ymax=12, colors='grey', ls='--', lw=0.5)
+        plt.text(values_centiles[percentile], 12, f'P{percentile}', horizontalalignment='center')
 
     # T'/(1-T') part
     smoothed_y_primary_before = tax_ratio_by_earning(total_earning = total_earning,
@@ -257,16 +272,16 @@ def pareto_bounds(df, beginning_year, end_year):
     list_ETI_lower = [5, 4, 3, 2]
     base_lower_bound = - cdf/(grid_earnings * pdf) 
 
-    condition_threshold_low =  (grid_earnings < np.percentile(total_earning, 90))
+    condition_threshold_low =  (grid_earnings > values_centiles[8]) & (grid_earnings < values_centiles[35])
     
     for ETI in list_ETI_lower:
         lower_bound = base_lower_bound * 1/ETI
         plt.plot(grid_earnings[condition_threshold_low], lower_bound[condition_threshold_low], label=ETI)
 
-    tab_percentile_low = [10, 25, 50]
+    tab_percentile_low = [10, 25]
     for percentile in tab_percentile_low:
-        plt.vlines(x=np.percentile(total_earning, percentile), ymin=-5, ymax=2, colors='grey', ls='--', lw=0.5)
-        plt.text(np.percentile(total_earning, percentile), 2, f'P{percentile}', horizontalalignment='center')
+        plt.vlines(x=values_centiles[percentile], ymin=-5, ymax=2, colors='grey', ls='--', lw=0.5)
+        plt.text(values_centiles[percentile], 2, f'P{percentile}', horizontalalignment='center')
 
     plt.plot(grid_earnings[condition_threshold_low], smoothed_y_primary_before[condition_threshold_low], label='MTR ratio before', color = 'blue')   
     plt.plot(grid_earnings[condition_threshold_low], smoothed_y_primary_after[condition_threshold_low], label='MTR ratio after', color = 'red')   
@@ -302,8 +317,9 @@ def main_function(beginning_year = None, end_year = None):
     work_df = people_df.sort_values(by='earnings_rank')
     work_df['cum_weight'] = work_df['wprm'].cumsum()
 
-    # we compute the total_weight that helps us define the deciles
+    # we compute the total_weight that helps us define the deciles and centiles
     total_weight = work_df['wprm'].sum()
+
     deciles = [total_weight/10*i for i in range(1,11)]
     work_df['decile'] = np.searchsorted(deciles, work_df['cum_weight']) + 1
     work_df.loc[work_df['cum_weight'] > deciles[-1], 'decile'] = 10
