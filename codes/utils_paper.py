@@ -199,7 +199,7 @@ def pareto_bounds(df, beginning_year, end_year):
 
     work_df = df.copy()
     work_df.sort_values(by="total_earning", inplace=True)
-    work_df = work_df[work_df["total_earning"] > 0] # for this function we remove null earnings otherwise problem with grid and estimates
+    #work_df = work_df[work_df["total_earning"] > 0] # for this function we remove null earnings otherwise problem with grid and estimates
 
     total_earning = work_df["total_earning"].values # we base computations on the year before the reform
     weights = work_df["wprm"].values
@@ -214,7 +214,7 @@ def pareto_bounds(df, beginning_year, end_year):
 
     # we compute weighted centiles and store them in a dictionary values_centiles
     values_centiles = {}
-    tab_values = [1, 10, 15, 25, 50, 75, 90, 95, 99]
+    tab_values = [1, 5, 8, 10, 15, 20, 25, 35, 50, 75, 90, 95, 99]
     for value in tab_values:
         values_centiles[value] = np.mean(total_earning[centiles == value])
 
@@ -232,7 +232,7 @@ def pareto_bounds(df, beginning_year, end_year):
     base_upper_bound = (1 - cdf)/(grid_earnings * pdf) 
     
     
-    condition_threshold = (grid_earnings > values_centiles[15]) & (grid_earnings < values_centiles[99])
+    condition_threshold = (grid_earnings > values_centiles[20]) & (grid_earnings < values_centiles[99])
     
     for ETI in list_ETI_upper:
         upper_bound = base_upper_bound * 1/ETI
@@ -272,13 +272,13 @@ def pareto_bounds(df, beginning_year, end_year):
     list_ETI_lower = [5, 4, 3, 2]
     base_lower_bound = - cdf/(grid_earnings * pdf) 
 
-    condition_threshold_low =  (grid_earnings < values_centiles[90])
+    condition_threshold_low =  (grid_earnings > values_centiles[8]) & (grid_earnings < values_centiles[35])
     
     for ETI in list_ETI_lower:
         lower_bound = base_lower_bound * 1/ETI
         plt.plot(grid_earnings[condition_threshold_low], lower_bound[condition_threshold_low], label=ETI)
 
-    tab_percentile_low = [10, 25, 50]
+    tab_percentile_low = [10, 25]
     for percentile in tab_percentile_low:
         plt.vlines(x=values_centiles[percentile], ymin=-5, ymax=2, colors='grey', ls='--', lw=0.5)
         plt.text(values_centiles[percentile], 2, f'P{percentile}', horizontalalignment='center')
