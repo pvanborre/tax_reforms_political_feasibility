@@ -199,7 +199,7 @@ def pareto_bounds(df, beginning_year, end_year):
 
     work_df = df.copy()
     work_df.sort_values(by="total_earning", inplace=True)
-    #work_df = work_df[work_df["total_earning"] > 0] # for this function we remove null earnings otherwise problem with grid and estimates
+    #work_df = work_df[work_df["total_earning"] > 0] # for this function we remove null earnings otherwise problem with grid and estimates, in fact not needed (and is consistent with all other functions)
 
     total_earning = work_df["total_earning"].values # we base computations on the year before the reform
     weights = work_df["wprm"].values
@@ -231,18 +231,19 @@ def pareto_bounds(df, beginning_year, end_year):
     list_ETI_upper = [0.25, 0.5, 1., 1.25]  
     base_upper_bound = (1 - cdf)/(grid_earnings * pdf) 
     
-    
-    condition_threshold = (grid_earnings > values_centiles[20]) & (grid_earnings < values_centiles[99])
+    max_earnings = 60000
+    max_y = 5
+    condition_threshold = (grid_earnings > values_centiles[20]) & (grid_earnings < max_earnings)
     
     for ETI in list_ETI_upper:
         upper_bound = base_upper_bound * 1/ETI
         plt.plot(grid_earnings[condition_threshold], upper_bound[condition_threshold], label=ETI)
 
     # we add vertical lines to the graph to indicate percentiles
-    tab_percentile = [25, 50, 75, 90, 95, 99]
+    tab_percentile = [25, 50, 75, 90, 95]
     for percentile in tab_percentile:
-        plt.vlines(x=values_centiles[percentile], ymin=0, ymax=12, colors='grey', ls='--', lw=0.5)
-        plt.text(values_centiles[percentile], 12, f'P{percentile}', horizontalalignment='center')
+        plt.vlines(x=values_centiles[percentile], ymin=0, ymax=max_y-1, colors='grey', ls='--', lw=0.5)
+        plt.text(values_centiles[percentile], max_y-1, f'P{percentile}', horizontalalignment='center')
 
     # T'/(1-T') part
     smoothed_y_primary_before = tax_ratio_by_earning(total_earning = total_earning,
@@ -257,9 +258,9 @@ def pareto_bounds(df, beginning_year, end_year):
                                               weights = weights)
 
 
-    plt.plot(grid_earnings[condition_threshold], smoothed_y_primary_before[condition_threshold], label='MTR ratio before', color = 'blue')   
-    plt.plot(grid_earnings[condition_threshold], smoothed_y_primary_after[condition_threshold], label='MTR ratio after', color = 'red')   
-
+    plt.plot(grid_earnings[condition_threshold], smoothed_y_primary_before[condition_threshold], label='MTR ratio before', color = 'black')   
+    plt.plot(grid_earnings[condition_threshold], smoothed_y_primary_after[condition_threshold], label='MTR ratio after', color = 'blue')   
+    plt.ylim(0, max_y)
     
     plt.title('Upper Pareto Bound')  
     plt.legend()
