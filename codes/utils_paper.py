@@ -150,12 +150,12 @@ def tax_ratio_by_earning(total_earning, grid_earnings, mtr_ratio, weights):
     return smoothed_y_primary
 
 
-def robustness_check_pareto_bound(grid_earnings, cdf, pdf, beginning_year, end_year):
+def distribution_checks(grid_earnings, cdf, pdf, beginning_year, end_year):
     """
-    Plots components of the Pareto bound separately, that is plots :
-    - the tail distribution/survival function 1 - cdf
+    Checks the aspect of the earnings distribution by means of : 
+    - the cumulative distribution function cdf
     - the density pdf 
-    - the ratio of the two that is almost the upper Pareto bound (still need to account for y and the ETI)
+    - the inverse hazard rate (1-cdf)/pdf
     """
 
     plt.figure()
@@ -208,14 +208,19 @@ def pareto_bounds(df, beginning_year, end_year):
     for value in tab_values:
         values_centiles[value] = np.mean(total_earning[centiles == value])
 
-    grid_earnings = np.linspace(1, values_centiles[99], 1000)
+    grid_earnings = np.linspace(values_centiles[1], values_centiles[99], 1000)
     
     # Pareto Bounds part
     kde = gaussian_kde(total_earning, weights=weights)    
     pdf = kde(grid_earnings)
     cdf = np.cumsum(pdf) / np.sum(pdf)
 
-    robustness_check_pareto_bound(grid_earnings, cdf, pdf, beginning_year, end_year)
+    distribution_checks(grid_earnings, cdf, pdf, beginning_year, end_year)
+
+    # we kept null earnings for the cdf, pdf, now we remove them for the bound
+    pdf = pdf[grid_earnings > 0]
+    cdf = cdf[grid_earnings > 0]
+    grid_earnings = grid_earnings[grid_earnings > 0]
 
     plt.figure()
     list_ETI_upper = [0.25, 0.5, 1., 1.25]  
