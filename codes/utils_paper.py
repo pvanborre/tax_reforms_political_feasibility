@@ -190,7 +190,6 @@ def pareto_bounds(df, beginning_year, end_year):
 
     work_df = df.copy()
     work_df.sort_values(by="total_earning", inplace=True)
-    #work_df = work_df[work_df["total_earning"] > 0] # for this function we remove null earnings otherwise problem with grid and estimates, in fact not needed (and is consistent with all other functions)
 
     total_earning = work_df["total_earning"].values # we base computations on the year before the reform
     weights = work_df["wprm"].values
@@ -209,7 +208,7 @@ def pareto_bounds(df, beginning_year, end_year):
     for value in tab_values:
         values_centiles[value] = np.mean(total_earning[centiles == value])
 
-    grid_earnings = np.linspace(values_centiles[1], values_centiles[99], 1000)
+    grid_earnings = np.linspace(1, values_centiles[99], 1000)
     
     # Pareto Bounds part
     kde = gaussian_kde(total_earning, weights=weights)    
@@ -297,13 +296,18 @@ def pareto_bounds(df, beginning_year, end_year):
 def main_function(beginning_year = None, end_year = None):
     if end_year == -1:
         end_year = beginning_year + 1 #reform phased in over 2 years only 
+    print("years under consideration", beginning_year, end_year)
 
     # read csv
     people_df = pd.read_csv(f'excel/{beginning_year}-{end_year}/people_adults_{beginning_year}-{end_year}.csv')
 
     # very few individuals have weight 0, we remove them (a bit weird)
-    print("number outliers removed", len(people_df[people_df["wprm"] == 0]))
+    print("number outliers removed : null weights", len(people_df[people_df["wprm"] == 0]))
     people_df = people_df[people_df["wprm"] != 0]
+
+    print("number outliers removed : negative earnings", len(people_df[people_df["total_earning"] < 0]))
+    people_df = people_df[people_df["total_earning"] >= 0] # we remove negative earnings 
+
 
     # we sort the dataframe by earnings so that the cumulative sum of the weights gives info about deciles
     work_df = people_df.sort_values(by='earnings_rank')
