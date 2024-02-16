@@ -227,12 +227,12 @@ def pareto_bounds(df, beginning_year, end_year):
     base_upper_bound = (1 - cdf)/(grid_earnings * pdf) 
     
     max_earnings = 60000
-    max_y = 5
+    max_y = 3
     condition_threshold = (grid_earnings > values_centiles[20]) & (grid_earnings < max_earnings)
     
     for ETI in list_ETI_upper:
         upper_bound = base_upper_bound * 1/ETI
-        plt.plot(grid_earnings[condition_threshold], upper_bound[condition_threshold], label=ETI)
+        plt.plot(grid_earnings[condition_threshold], upper_bound[condition_threshold])
 
     # we add vertical lines to the graph to indicate percentiles
     tab_percentile = [25, 50, 75, 90, 95]
@@ -253,12 +253,9 @@ def pareto_bounds(df, beginning_year, end_year):
                                               weights = weights)
 
 
-    plt.plot(grid_earnings[condition_threshold], smoothed_y_primary_before[condition_threshold], label='MTR ratio before', color = 'black')   
-    plt.plot(grid_earnings[condition_threshold], smoothed_y_primary_after[condition_threshold], label='MTR ratio after', color = 'blue')   
+    plt.plot(grid_earnings[condition_threshold], smoothed_y_primary_before[condition_threshold], color = 'blue')   
+    plt.plot(grid_earnings[condition_threshold], smoothed_y_primary_after[condition_threshold], color = 'black')   
     plt.ylim(0, max_y)
-    
-    plt.title('Upper Pareto Bound')  
-    plt.legend()
     plt.show()
     plt.savefig('../outputs/upper_pareto_bound/upper_pareto_bound_{beginning_year}-{end_year}.png'.format(beginning_year = beginning_year, end_year = end_year))
     plt.close()
@@ -272,19 +269,19 @@ def pareto_bounds(df, beginning_year, end_year):
     
     for ETI in list_ETI_lower:
         lower_bound = base_lower_bound * 1/ETI
-        plt.plot(grid_earnings[condition_threshold_low], lower_bound[condition_threshold_low], label=ETI)
+        plt.plot(grid_earnings[condition_threshold_low], lower_bound[condition_threshold_low])
 
+    max_y_lower = 0.25
+    min_y_lower = -1
+    
     tab_percentile_low = [10, 25]
     for percentile in tab_percentile_low:
-        plt.vlines(x=values_centiles[percentile], ymin=-5, ymax=2, colors='grey', ls='--', lw=0.5)
-        plt.text(values_centiles[percentile], 2, f'P{percentile}', horizontalalignment='center')
+        plt.vlines(x=values_centiles[percentile], ymin=min_y_lower, ymax=max_y_lower-0.35, colors='grey', ls='--', lw=0.5)
+        plt.text(values_centiles[percentile], max_y_lower-0.35, f'P{percentile}', horizontalalignment='center')
 
-    plt.plot(grid_earnings[condition_threshold_low], smoothed_y_primary_before[condition_threshold_low], label='MTR ratio before', color = 'blue')   
-    plt.plot(grid_earnings[condition_threshold_low], smoothed_y_primary_after[condition_threshold_low], label='MTR ratio after', color = 'red')   
-
-    
-    plt.title('Lower Pareto Bound')  
-    plt.legend()
+    plt.plot(grid_earnings[condition_threshold_low], smoothed_y_primary_before[condition_threshold_low], color = 'blue')   
+    plt.plot(grid_earnings[condition_threshold_low], smoothed_y_primary_after[condition_threshold_low], color = 'black')   
+    plt.ylim(min_y_lower, max_y_lower) 
     plt.show()
     plt.savefig('../outputs/lower_pareto_bound/lower_pareto_bound_{beginning_year}-{end_year}.png'.format(beginning_year = beginning_year, end_year = end_year))
     plt.close()
