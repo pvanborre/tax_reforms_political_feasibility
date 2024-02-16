@@ -157,32 +157,23 @@ def robustness_check_pareto_bound(grid_earnings, cdf, pdf, beginning_year, end_y
     - the density pdf 
     - the ratio of the two that is almost the upper Pareto bound (still need to account for y and the ETI)
     """
-    fig, axs = plt.subplots(3, 1, figsize=(8, 12))
-    # TODO 3 different figures 
 
     plt.figure()
-    for col in df_results.columns:
-        plt.scatter(df_results.index, df_results[col])
-    plt.xticks(range(1, 11))  
+    plt.plot(grid_earnings, cdf)
     plt.show()
-    plt.savefig('../outputs/beneficiaries_decile/beneficiaries_decile_{beginning_year}-{end_year}.png'.format(beginning_year = beginning_year, end_year = end_year))
+    plt.savefig('../outputs/cdf/cdf_{beginning_year}-{end_year}.png'.format(beginning_year = beginning_year, end_year = end_year))
     plt.close()
 
-    axs[0].plot(grid_earnings, 1 - cdf, label='1 - cdf')
-    axs[0].set_title('1 - cdf')
-
-    axs[1].plot(grid_earnings, pdf, label='pdf')
-    axs[1].set_title('pdf')
-
-    axs[2].plot(grid_earnings, (1 - cdf) / pdf, label='(1 - cdf) / pdf')
-    axs[2].set_title('(1 - cdf) / pdf')
-
-    for ax in axs:
-        ax.legend()
-
-    plt.tight_layout()
+    plt.figure()
+    plt.plot(grid_earnings, pdf)
     plt.show()
-    plt.savefig('../outputs/pareto_bound_robustness/pareto_bound_robustness_{beginning_year}-{end_year}.png'.format(beginning_year = beginning_year, end_year = end_year))
+    plt.savefig('../outputs/pdf/pdf_{beginning_year}-{end_year}.png'.format(beginning_year = beginning_year, end_year = end_year))
+    plt.close()
+
+    plt.figure()
+    plt.plot(grid_earnings, (1-cdf)/pdf)
+    plt.show()
+    plt.savefig('../outputs/inverse_hazard_rate/inverse_hazard_rate_{beginning_year}-{end_year}.png'.format(beginning_year = beginning_year, end_year = end_year))
     plt.close()
 
 def pareto_bounds(df, beginning_year, end_year):
