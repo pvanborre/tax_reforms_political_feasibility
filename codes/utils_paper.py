@@ -34,21 +34,18 @@ def tax_liability_difference(work_df, beginning_year, end_year):
 
 
     plt.figure()
-    plt.scatter(result.index, result.values, label = "Average per decile of the difference in tax liability", color = "blue")
-    plt.plot(x_interpolated, y_interpolated, label='Quadratic Polynomial Fit', color='red')
-    plt.title('Changes in Tax Liability: Average Values per Decile')
+    plt.scatter(result.index, result.values, color = "blue")
+    plt.plot(x_interpolated, y_interpolated, color='red')
     plt.xticks(range(1, 11))  
-    plt.legend()
     plt.show()
     plt.savefig('../outputs/tax_liability_difference/tax_liability_difference_{beginning_year}-{end_year}.png'.format(beginning_year = beginning_year, end_year = end_year))
     plt.close()
 
-
-
-    plt.figure(figsize=(10, 6))
+    fig, ax = plt.subplots(1, 1, figsize = (10, 6), dpi=300)
     sns.boxplot(x='decile', y='difference_recomputed', data=work_df, showfliers=False)
-    plt.title('Changes in Tax Liability: Heterogeneity within Deciles')
-    plt.xticks(range(1, 11))  
+    ax.set_ylabel('')    
+    ax.set_xlabel('')
+    plt.xticks(range(0, 11))  
     plt.show()
     plt.savefig('../outputs/tax_liability_difference_boxplot/tax_liability_difference_boxplot_{beginning_year}-{end_year}.png'.format(beginning_year = beginning_year, end_year = end_year))
     plt.close()
