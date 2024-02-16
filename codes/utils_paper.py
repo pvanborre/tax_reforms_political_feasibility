@@ -80,9 +80,7 @@ def beneficiary_reform(df, list_ETI, beginning_year, end_year):
 
     plt.figure()
     for col in df_results.columns:
-        plt.scatter(df_results.index, df_results[col], label=f'Elasticity {col}')
-    plt.title('Winners and Losers of Major French Tax Reforms')
-    plt.legend()
+        plt.scatter(df_results.index, df_results[col])
     plt.xticks(range(1, 11))  
     plt.show()
     plt.savefig('../outputs/beneficiaries_decile/beneficiaries_decile_{beginning_year}-{end_year}.png'.format(beginning_year = beginning_year, end_year = end_year))
@@ -95,18 +93,16 @@ def beneficiary_reform(df, list_ETI, beginning_year, end_year):
     for ETI in list_ETI:
         percentage_winners = 100*np.average(df[f"winner_{ETI}"], weights=df['wprm'])
         percentage_winners_median = 100*np.average(median_df[f"winner_{ETI}"], weights=median_df['wprm'])
-        plt.scatter(percentage_winners_median, percentage_winners, label=ETI)
+        plt.scatter(percentage_winners_median, percentage_winners)
 
     x = np.linspace(0,100,100)
     plt.plot(x, x, linestyle='--') 
     plt.hlines(y = 50, xmin = 0, xmax = 100)
     plt.vlines(x = 50, ymin = 0, ymax = 100)
-    plt.title('Majority Support versus Support by the Median Voter')
-    plt.xlabel('Median support')
-    plt.ylabel('Whole population support')
+    # plt.xlabel('Median support')
+    # plt.ylabel('Whole population support')
     plt.xlim(0,100)
     plt.ylim(0,100)
-    plt.legend() 
     plt.show()
     plt.savefig('../outputs/alignment_support/alignment_support_{beginning_year}-{end_year}.png'.format(beginning_year = beginning_year, end_year = end_year))
     plt.close()
@@ -123,11 +119,9 @@ def increased_progressivity(df, beginning_year, end_year):
 
 
     plt.figure()
-    plt.scatter(result_before.index, result_before.values, c = "blue", label = beginning_year)
-    plt.scatter(result_after.index, result_after.values, c = "red", label = end_year)
-    plt.title("T'/(1-T') by Decile before and after Each Reform")
+    plt.scatter(result_before.index, result_before.values, c = "blue")
+    plt.scatter(result_after.index, result_after.values, c = "red")
     plt.xticks(range(1, 11))  
-    plt.legend()
     plt.show()
     plt.savefig('../outputs/increased_progressivity/increased_progressivity_{beginning_year}-{end_year}.png'.format(beginning_year = beginning_year, end_year = end_year))
     plt.close()
@@ -164,6 +158,15 @@ def robustness_check_pareto_bound(grid_earnings, cdf, pdf, beginning_year, end_y
     - the ratio of the two that is almost the upper Pareto bound (still need to account for y and the ETI)
     """
     fig, axs = plt.subplots(3, 1, figsize=(8, 12))
+    # TODO 3 different figures 
+
+    plt.figure()
+    for col in df_results.columns:
+        plt.scatter(df_results.index, df_results[col])
+    plt.xticks(range(1, 11))  
+    plt.show()
+    plt.savefig('../outputs/beneficiaries_decile/beneficiaries_decile_{beginning_year}-{end_year}.png'.format(beginning_year = beginning_year, end_year = end_year))
+    plt.close()
 
     axs[0].plot(grid_earnings, 1 - cdf, label='1 - cdf')
     axs[0].set_title('1 - cdf')
