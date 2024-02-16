@@ -189,17 +189,8 @@ def pareto_bounds(df, beginning_year, end_year):
     """
 
     work_df = df.copy()
-    work_df.sort_values(by="total_earning", inplace=True)
-
     total_earning = work_df["total_earning"].values # we base computations on the year before the reform
     weights = work_df["wprm"].values
-
-    # we add centiles to the dataframe 
-    total_weight = np.sum(weights)
-    work_df['cum_weight2'] = work_df['wprm'].cumsum()
-    centiles = [total_weight/100*i for i in range(1,101)]
-    work_df['centile'] = np.searchsorted(centiles, work_df['cum_weight2']) + 1
-    work_df.loc[work_df['cum_weight2'] > centiles[-1], 'centile'] = 100
     centiles = work_df["centile"].values
 
     # we compute weighted centiles and store them in a dictionary values_centiles
@@ -317,10 +308,12 @@ def main_function(beginning_year = None, end_year = None):
 
     # we compute the total_weight that helps us define the deciles and centiles
     total_weight = work_df['wprm'].sum()
-
-    deciles = [total_weight/10*i for i in range(1,11)]
-    work_df['decile'] = np.searchsorted(deciles, work_df['cum_weight']) + 1
-    work_df.loc[work_df['cum_weight'] > deciles[-1], 'decile'] = 10
+    tab_names_quantiles = ["decile", "centile", "vingtile"]
+    tab_values_quantiles = [10, 100, 20]
+    for j in range(len(tab_names_quantiles)):
+        quantiles = [total_weight/tab_values_quantiles[j]*i for i in range(1,tab_values_quantiles[j]+1)]
+        work_df[tab_names_quantiles[j]] = np.searchsorted(quantiles, work_df['cum_weight']) + 1
+        work_df.loc[work_df['cum_weight'] > quantiles[-1], tab_names_quantiles[j]] = tab_values_quantiles[j]
 
     work_df["mtr_ratio_before"] = work_df["marginal_tax_rate_before_reform"]/(1 - work_df["marginal_tax_rate_before_reform"])
     work_df["mtr_ratio_after"] = work_df["marginal_tax_rate_after_reform"]/(1 - work_df["marginal_tax_rate_after_reform"])
