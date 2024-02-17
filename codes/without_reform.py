@@ -171,13 +171,8 @@ def simulate_without_reform(erfs_year = None, end_year = None):
 
     simulation = initialize_simulation(tax_benefit_system, data_people)
 
-    # earnings of year N are taxed according formulas for year N+1
-    erfs_formulas_year = str(erfs_year+1)
-    end_formulas_year = str(end_year+1)
-
-    erfs_year = str(erfs_year)
-    end_year = str(end_year) 
-    
+    beginning_reform = str(erfs_year)
+    end_reform = str(end_year)
 
     # only household information
     data_households = data_people.drop_duplicates(subset='idmen', keep='first')
@@ -191,9 +186,9 @@ def simulate_without_reform(erfs_year = None, end_year = None):
     """
 
     # data we can get from INSEE website https://www.insee.fr/fr/statistiques/serie/001763852
-    # check these values again : I took only January values 
-    CPI = {'2019': 102.67, '2018': 101.67, '2017': 100.41, '2016': 99.07, '2015': 98.85, '2014': 99.26, '2013': 98.71, '2012': 97.68, '2011': 95.51, '2010': 93.92, '2009': 92.98, '2008': 92.33, '2007': 89.85, '2006': 88.73, '2005': 86.91, '2004': 85.61, '2003': 84.42, '2002': 82.89}
-    inflation_coeff = (CPI[end_year]-CPI[erfs_year])/CPI[erfs_year]
+    # check these values again : I took only December values 
+    CPI = {'2001': 82.63, '2002': 84.41, '2003': 85.76, '2004': 87.4, '2005': 88.82, '2006': 90.16, '2007': 92.44, '2008': 93.37, '2009': 94.14, '2010': 95.74, '2011': 98.04, '2012': 99.23, '2013': 99.87, '2014': 99.86, '2015': 100.04, '2016': 100.66, '2017': 101.76, '2018': 103.16, '2019': 104.39, '2020': 104.09}
+    inflation_coeff = (CPI[end_reform]-CPI[beginning_reform])/CPI[beginning_reform]
     print("Inflation coefficient", inflation_coeff)
 
 
