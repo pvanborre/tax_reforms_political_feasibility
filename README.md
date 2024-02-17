@@ -6,7 +6,10 @@ Repo to store codes using the microsimulation tool OpenFisca in order to see whe
 The goal of this repository is to reproduce the framework and American empirical analysis of this paper : https://www.aeaweb.org/articles?id=10.1257/aer.20190021 (Bierbrauer, Felix J., Pierre C. Boyer, and Andreas Peichl. 2021. "Politically Feasible Reforms of Nonlinear Tax Systems." American Economic Review, 111 (1): 153-91.)
 
 The main files of this repositories are the following : 
-TODO 
+
++ without_reform.py : prepares our dataset (input is a .h5 file, output is a .csv file)
+
++ utils_paper.py : produces all outputs of the paper (input is the .csv file of the without_reform.py file)
 
 
 # Installation 
