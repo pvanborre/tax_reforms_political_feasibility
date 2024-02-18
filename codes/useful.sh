@@ -35,7 +35,7 @@ cd ..
 
 ################################################################################
 # Get data from the simulations
-for i in $(seq 2002 2018);
+for i in $(seq 2002 2019);
 do
     python without_reform.py -y $i
 done
@@ -43,7 +43,7 @@ done
 
 ################################################################################
 # Run utils
-for i in $(seq 2002 2018);
+for i in $(seq 2002 2019);
 do
     python utils_paper.py -y $i
 done

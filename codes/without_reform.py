@@ -123,22 +123,29 @@ def deal_with_married_couples(data_people, earnings_variables):
 
 
 @click.command()
-@click.option('-y', '--beginning_year', default = None, type = int, required = True)
+@click.option('-y', '--erfs_year', default = None, type = int, required = True)
 @click.option('-e', '--end_year', default = -1, type = int, required = True)
-def simulate_without_reform(beginning_year = None, end_year = None):
+def simulate_without_reform(erfs_year = None, end_year = None):
+    """
+    erfs_year is the ERFS (dataset) year : it provides information about individuals of year erfs_year : earnings they had during this year.
+    The French tax and transfers system is organized such that earnings of the year erfs_year are taxed according to the tax transfer formula of the year erfs_year + 1.
+    We want to build a panel structure across 2 years, that is considering same individuals of the ERFS erfs_year the following year erfs_year+1. 
+    To do so we construct artificial earnings that are the original earnings inflated. These earnings are taxed according to formulas for the year erfs_year +2. 
+    """
     if end_year == -1:
-        end_year = beginning_year + 1 #reform phased over 2 years only 
+        end_year = erfs_year + 1 #reform phased over 2 years only
+    print("Years under consideration", erfs_year, end_year) 
 
     # load individuals and households data and combine the two datasets  
-    filename = "../data/{}/openfisca_erfs_fpr_{}.h5".format(beginning_year, beginning_year)
-    data_people_brut = pandas.read_hdf(filename, key = "individu_{}".format(beginning_year))
-    data_households_brut =  pandas.read_hdf(filename, key = "menage_{}".format(beginning_year))
+    filename = "../data/{}/openfisca_erfs_fpr_{}.h5".format(erfs_year, erfs_year)
+    data_people_brut = pandas.read_hdf(filename, key = "individu_{}".format(erfs_year))
+    data_households_brut =  pandas.read_hdf(filename, key = "menage_{}".format(erfs_year))
     data_people = data_people_brut.merge(data_households_brut, right_index = True, left_on = "idmen", suffixes = ("", "_x"))
 
     # remark : the idea in OpenFisca France-data is to say that individuals have the weight of their households (what is done in the left join above)
     # (but we work here at the indiviudal level so no need to construct a foyer fiscal weight)
 
-    if beginning_year <= 2013: #there is no pensions_invalidite
+    if erfs_year <= 2013: #there is no pensions_invalidite
         earnings_columns = ["chomage_brut", "pensions_alimentaires_percues", "rag", "retraite_brute",
             "ric", "rnc", "rpns_imposables", "salaire_de_base", "primes_fonction_publique", "traitement_indiciaire_brut"]
 
@@ -157,16 +164,15 @@ def simulate_without_reform(beginning_year = None, end_year = None):
     #####################################################
     ########### Simulation ##############################
     #####################################################
-    if beginning_year <= 2003:
+    if erfs_year <= 2003:
         tax_benefit_system = modify_parameters_2003(FranceTaxBenefitSystem())
     else:
         tax_benefit_system = FranceTaxBenefitSystem()
 
     simulation = initialize_simulation(tax_benefit_system, data_people)
 
-    beginning_reform = str(beginning_year)
-    end_reform = str(end_year) 
-    print("Years under consideration", beginning_reform, end_reform)
+    beginning_reform = str(erfs_year)
+    end_reform = str(end_year)
 
     # only household information
     data_households = data_people.drop_duplicates(subset='idmen', keep='first')
@@ -180,8 +186,8 @@ def simulate_without_reform(beginning_year = None, end_year = None):
     """
 
     # data we can get from INSEE website https://www.insee.fr/fr/statistiques/serie/001763852
-    # check these values again : I took only January values 
-    CPI = {'2019': 102.67, '2018': 101.67, '2017': 100.41, '2016': 99.07, '2015': 98.85, '2014': 99.26, '2013': 98.71, '2012': 97.68, '2011': 95.51, '2010': 93.92, '2009': 92.98, '2008': 92.33, '2007': 89.85, '2006': 88.73, '2005': 86.91, '2004': 85.61, '2003': 84.42, '2002': 82.89}
+    # I took only December values 
+    CPI = {'2002': 84.41, '2003': 85.76, '2004': 87.4, '2005': 88.82, '2006': 90.16, '2007': 92.44, '2008': 93.37, '2009': 94.14, '2010': 95.74, '2011': 98.04, '2012': 99.23, '2013': 99.87, '2014': 99.86, '2015': 100.04, '2016': 100.66, '2017': 101.76, '2018': 103.16, '2019': 104.39, '2020': 104.09}
     inflation_coeff = (CPI[end_reform]-CPI[beginning_reform])/CPI[beginning_reform]
     print("Inflation coefficient", inflation_coeff)
 
@@ -195,14 +201,16 @@ def simulate_without_reform(beginning_year = None, end_year = None):
             
             if ma_variable not in ["loyer", "zone_apl", "statut_occupation_logement", "taxe_habitation", "logement_conventionne"]: # all variables at the individual level
                 simulation.set_input(ma_variable, beginning_reform, numpy.array(data_people[ma_variable]))
+                # important : the year is indeed beginning_reform and not str(int(beginning_reform) + 1) since OpenFisca works on earnings years
+                # in French : années de "revenus imposables" et non pas année de taxation réelle des revenus ("année IR")
 
                 if ma_variable not in earnings_columns: #variables where no need to account for inflation
                     simulation.set_input(ma_variable, end_reform, numpy.array(data_people[ma_variable])) 
                 else: #here we account for inflation
                     simulation.set_input(ma_variable, end_reform, numpy.array(data_people[ma_variable])*(1+inflation_coeff))
                     # even when we have ETI values different from 0, we let this earning y1 = y0_hat (inflated)
-                    # because with the ETI y1 = [1 - ETI*(tau1 - tau0)/(1-tau0)]y0 relies on tau1 (serpent qui se mort la queue sinon)
-                    # TODO ask Pierre whether this is correct 
+                    # because with the ETI y1 = [1 - ETI*(tau1 - tau0)/(1-tau0)]y0 relies on tau1 (catch-22 otherwise)
+                     
 
             else: # all variables at the household level
                 simulation.set_input(ma_variable, beginning_reform, numpy.array(data_households[ma_variable]))
@@ -242,7 +250,7 @@ def simulate_without_reform(beginning_year = None, end_year = None):
     data_foyerfiscaux['average_tax_rate_after_reform'] = average_tax_rate_after_reform
     data_foyerfiscaux['marginal_tax_rate_after_reform'] = marginal_tax_rate_after_reform
 
-    # TODO question : also compute from the simulation rni (revenu net imposable) since average_tax_rate = tax_liability/rni ?
+    # question : also compute from the simulation rni (revenu net imposable) since average_tax_rate = tax_liability/rni ? (answer : i don't think so since rni defined at the foyer fiscal level see https://github.com/openfisca/openfisca-france/blob/master/openfisca_france/model/prelevements_obligatoires/impot_revenu/ir.py line 1273)
 
     # we add this foyer fiscal information to the individual level : 
     # need to discard children otherwise children considered as paying the taxes of their foyer fiscal
@@ -266,10 +274,34 @@ def simulate_without_reform(beginning_year = None, end_year = None):
         data_people[f"total_earning_after_reform_{ETI}"] = (1 - (data_people["marginal_tax_rate_after_reform"]-data_people["marginal_tax_rate_before_reform"])/(1 - data_people["marginal_tax_rate_before_reform"])*ETI)*data_people["total_earning"]
         data_people[f'individual_revenue_effect_{ETI}'] = data_people["average_tax_rate_after_reform"]*data_people[f"total_earning_after_reform_{ETI}"] - data_people['average_tax_rate_before_reform']*data_people["total_earning"]
 
+    # very few individuals have weight 0 for years 2002 and 2003, we remove them (a bit weird)
+    print("number outliers removed : null weights", len(data_people[data_people["wprm"] == 0]))
+    data_people = data_people[data_people["wprm"] != 0]
 
-    print("data_people", data_people)
+    print("number outliers removed : negative earnings", len(data_people[data_people["total_earning"] < 0]))
+    data_people = data_people[data_people["total_earning"] >= 0] # we remove negative earnings 
 
-    data_people.to_csv(f'excel/{beginning_reform}-{end_reform}/people_adults_{beginning_reform}-{end_reform}.csv', index=False)
+
+    # we sort the dataframe by earnings so that the cumulative sum of the weights gives info about deciles
+    work_df = data_people.sort_values(by='earnings_rank')
+    work_df['cum_weight'] = work_df['wprm'].cumsum()
+
+    # we compute the total_weight that helps us define the deciles and centiles
+    total_weight = work_df['wprm'].sum()
+    tab_names_quantiles = ["decile", "centile", "vingtile"]
+    tab_values_quantiles = [10, 100, 20]
+    for j in range(len(tab_names_quantiles)):
+        quantiles = [total_weight/tab_values_quantiles[j]*i for i in range(1,tab_values_quantiles[j]+1)]
+        work_df[tab_names_quantiles[j]] = numpy.searchsorted(quantiles, work_df['cum_weight']) + 1
+        work_df.loc[work_df['cum_weight'] > quantiles[-1], tab_names_quantiles[j]] = tab_values_quantiles[j]
+
+    work_df["mtr_ratio_before"] = work_df["marginal_tax_rate_before_reform"]/(1 - work_df["marginal_tax_rate_before_reform"])
+    work_df["mtr_ratio_after"] = work_df["marginal_tax_rate_after_reform"]/(1 - work_df["marginal_tax_rate_after_reform"])
+    
+
+    print("data_people", work_df)
+
+    work_df.to_csv(f'excel/{beginning_reform}-{end_reform}/people_adults_{beginning_reform}-{end_reform}.csv', index=False)
 
 
 
