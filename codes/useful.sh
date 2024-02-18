@@ -1,7 +1,5 @@
 #!/bin/bash
 
-
-
 ################################################################################
 # Ensures we are at the good location to launch codes 
 expected_path="/app/codes"
@@ -32,6 +30,43 @@ done
 ################################################################################
 
 cd ..
+
+cd ..
+cd outputs
+
+################################################################################
+# Creates all subfolders needed to store the graphs 
+subfolders=(
+    "alignment_support"
+    "beneficiaries_decile"
+    "beneficiaries_vingtile"
+    "cdf"
+    "increased_progressivity"
+    "increased_progressivity_vingtile"
+    "inverse_hazard_rate"
+    "lower_pareto_bound"
+    "pdf"
+    "tax_liability_difference"
+    "tax_liability_difference_boxplot"
+    "tax_liability_difference_boxplot_vingtile"
+    "tax_liability_difference_vingtile"
+    "upper_pareto_bound"
+)
+
+# Loop through the list of subfolders and create them if they don't exist
+for folder in "${subfolders[@]}"; do
+    folder_path="$folder"
+    if [ ! -d "$folder_path" ]; then
+        mkdir -p "$folder_path"
+        echo "Created $folder_path"
+    else
+        echo "Folder $folder_path already exists"
+    fi
+done
+################################################################################
+
+cd ..
+cd codes 
 
 ################################################################################
 # Get data from the simulations
