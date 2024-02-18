@@ -307,42 +307,20 @@ def main_function(beginning_year = None, end_year = None):
     print("years under consideration", beginning_year, end_year)
 
     # read csv
-    people_df = pd.read_csv(f'excel/{beginning_year}-{end_year}/people_adults_{beginning_year}-{end_year}.csv')
-
-    # very few individuals have weight 0, we remove them (a bit weird)
-    print("number outliers removed : null weights", len(people_df[people_df["wprm"] == 0]))
-    people_df = people_df[people_df["wprm"] != 0]
-
-    print("number outliers removed : negative earnings", len(people_df[people_df["total_earning"] < 0]))
-    people_df = people_df[people_df["total_earning"] >= 0] # we remove negative earnings 
-
-
-    # we sort the dataframe by earnings so that the cumulative sum of the weights gives info about deciles
-    work_df = people_df.sort_values(by='earnings_rank')
-    work_df['cum_weight'] = work_df['wprm'].cumsum()
-
-    # we compute the total_weight that helps us define the deciles and centiles
-    total_weight = work_df['wprm'].sum()
-    tab_names_quantiles = ["decile", "centile", "vingtile"]
-    tab_values_quantiles = [10, 100, 20]
-    for j in range(len(tab_names_quantiles)):
-        quantiles = [total_weight/tab_values_quantiles[j]*i for i in range(1,tab_values_quantiles[j]+1)]
-        work_df[tab_names_quantiles[j]] = np.searchsorted(quantiles, work_df['cum_weight']) + 1
-        work_df.loc[work_df['cum_weight'] > quantiles[-1], tab_names_quantiles[j]] = tab_values_quantiles[j]
-
-    work_df["mtr_ratio_before"] = work_df["marginal_tax_rate_before_reform"]/(1 - work_df["marginal_tax_rate_before_reform"])
-    work_df["mtr_ratio_after"] = work_df["marginal_tax_rate_after_reform"]/(1 - work_df["marginal_tax_rate_after_reform"])
+    work_df = pd.read_csv(f'excel/{beginning_year}-{end_year}/people_adults_{beginning_year}-{end_year}.csv')
+    # requirements for work_df (if one wants to use this code utils_paper.py with another csv file) : 
+    # has to be sorted by increasing total_earnings, contains variables decile, vingtile and centile (cf steps at the end of the file without_reform.py)
     
-    # First, plot average difference in tax liability per decile
+    # First, plot average difference in tax liability per deciles (and then vingtiles for robustness)
     tax_liability_difference(work_df, beginning_year, end_year)
     tax_liability_difference(work_df, beginning_year, end_year, name_quantile="vingtile", value_quantile = 20)
 
-    # Then look at whether people were beneficiaries or losers of a reform 
+    # Then look at whether people were beneficiaries or losers of a reform, per deciles (and then vingtiles for robustness)
     list_ETI = [0., 0.25, 1., 1.25]
     beneficiary_reform(work_df, list_ETI, beginning_year, end_year)
     beneficiary_reform(work_df, list_ETI, beginning_year, end_year, name_quantile="vingtile", value_quantile = 20)
 
-    # then plot T'/(1-T') to see whether increased progressivity in the middle 
+    # then plot T'/(1-T') to see whether increased progressivity in the middle, per deciles (and then vingtiles for robustness)
     increased_progressivity(work_df, beginning_year, end_year)
     increased_progressivity(work_df, beginning_year, end_year, name_quantile="vingtile", value_quantile = 20)
 

@@ -186,8 +186,8 @@ def simulate_without_reform(erfs_year = None, end_year = None):
     """
 
     # data we can get from INSEE website https://www.insee.fr/fr/statistiques/serie/001763852
-    # check these values again : I took only December values 
-    CPI = {'2001': 82.63, '2002': 84.41, '2003': 85.76, '2004': 87.4, '2005': 88.82, '2006': 90.16, '2007': 92.44, '2008': 93.37, '2009': 94.14, '2010': 95.74, '2011': 98.04, '2012': 99.23, '2013': 99.87, '2014': 99.86, '2015': 100.04, '2016': 100.66, '2017': 101.76, '2018': 103.16, '2019': 104.39, '2020': 104.09}
+    # I took only December values 
+    CPI = {'2002': 84.41, '2003': 85.76, '2004': 87.4, '2005': 88.82, '2006': 90.16, '2007': 92.44, '2008': 93.37, '2009': 94.14, '2010': 95.74, '2011': 98.04, '2012': 99.23, '2013': 99.87, '2014': 99.86, '2015': 100.04, '2016': 100.66, '2017': 101.76, '2018': 103.16, '2019': 104.39, '2020': 104.09}
     inflation_coeff = (CPI[end_reform]-CPI[beginning_reform])/CPI[beginning_reform]
     print("Inflation coefficient", inflation_coeff)
 
@@ -201,6 +201,8 @@ def simulate_without_reform(erfs_year = None, end_year = None):
             
             if ma_variable not in ["loyer", "zone_apl", "statut_occupation_logement", "taxe_habitation", "logement_conventionne"]: # all variables at the individual level
                 simulation.set_input(ma_variable, beginning_reform, numpy.array(data_people[ma_variable]))
+                # important : the year is indeed beginning_reform and not str(int(beginning_reform) + 1) since OpenFisca works on earnings years
+                # in French : années de "revenus imposables" et non pas année de taxation réelle des revenus ("année IR")
 
                 if ma_variable not in earnings_columns: #variables where no need to account for inflation
                     simulation.set_input(ma_variable, end_reform, numpy.array(data_people[ma_variable])) 
@@ -272,10 +274,34 @@ def simulate_without_reform(erfs_year = None, end_year = None):
         data_people[f"total_earning_after_reform_{ETI}"] = (1 - (data_people["marginal_tax_rate_after_reform"]-data_people["marginal_tax_rate_before_reform"])/(1 - data_people["marginal_tax_rate_before_reform"])*ETI)*data_people["total_earning"]
         data_people[f'individual_revenue_effect_{ETI}'] = data_people["average_tax_rate_after_reform"]*data_people[f"total_earning_after_reform_{ETI}"] - data_people['average_tax_rate_before_reform']*data_people["total_earning"]
 
+    # very few individuals have weight 0 for years 2002 and 2003, we remove them (a bit weird)
+    print("number outliers removed : null weights", len(data_people[data_people["wprm"] == 0]))
+    data_people = data_people[data_people["wprm"] != 0]
 
-    print("data_people", data_people)
+    print("number outliers removed : negative earnings", len(data_people[data_people["total_earning"] < 0]))
+    data_people = data_people[data_people["total_earning"] >= 0] # we remove negative earnings 
 
-    data_people.to_csv(f'excel/{beginning_reform}-{end_reform}/people_adults_{beginning_reform}-{end_reform}.csv', index=False)
+
+    # we sort the dataframe by earnings so that the cumulative sum of the weights gives info about deciles
+    work_df = data_people.sort_values(by='earnings_rank')
+    work_df['cum_weight'] = work_df['wprm'].cumsum()
+
+    # we compute the total_weight that helps us define the deciles and centiles
+    total_weight = work_df['wprm'].sum()
+    tab_names_quantiles = ["decile", "centile", "vingtile"]
+    tab_values_quantiles = [10, 100, 20]
+    for j in range(len(tab_names_quantiles)):
+        quantiles = [total_weight/tab_values_quantiles[j]*i for i in range(1,tab_values_quantiles[j]+1)]
+        work_df[tab_names_quantiles[j]] = numpy.searchsorted(quantiles, work_df['cum_weight']) + 1
+        work_df.loc[work_df['cum_weight'] > quantiles[-1], tab_names_quantiles[j]] = tab_values_quantiles[j]
+
+    work_df["mtr_ratio_before"] = work_df["marginal_tax_rate_before_reform"]/(1 - work_df["marginal_tax_rate_before_reform"])
+    work_df["mtr_ratio_after"] = work_df["marginal_tax_rate_after_reform"]/(1 - work_df["marginal_tax_rate_after_reform"])
+    
+
+    print("data_people", work_df)
+
+    work_df.to_csv(f'excel/{beginning_reform}-{end_reform}/people_adults_{beginning_reform}-{end_reform}.csv', index=False)
 
 
 
