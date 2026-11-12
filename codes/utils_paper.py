@@ -268,7 +268,7 @@ def pareto_bounds(df, beginning_year, end_year):
 
 
     plt.figure()
-    list_ETI_lower = [5, 4, 3, 2]
+    list_ETI_lower = [0.25, 0.5, 1, 1.25]
     base_lower_bound = - cdf/(grid_earnings * pdf) 
 
     condition_threshold_low =  (grid_earnings > values_centiles[8]) & (grid_earnings < values_centiles[35])
